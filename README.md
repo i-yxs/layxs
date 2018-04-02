@@ -68,7 +68,7 @@ layxs.msg({
 //简易写法 参数：(文本)
 layxs.msg('你好，欢迎使用 layxs ');
 ```
-> #### 特有参数
+> ##### 特有参数
 ```javascript
 {
     //文本
@@ -102,7 +102,7 @@ layxs.tips({
 //简易写法 参数：(文本,吸附元素,方位,显示持续时间)
 layxs.tips('hello，我是Tips', 'DOM元素', 'top', 2000);
 ```
-> #### 特有参数
+> ##### 特有参数
 ```javascript
 {
     //文本
@@ -138,7 +138,7 @@ layxs.alert({
 //简易写法 参数：(文本)
 layxs.alert('你好，欢迎使用 layxs ');
 ```
-> #### 特有参数
+> ##### 特有参数
 ```javascript
 {
     //文本
@@ -170,7 +170,7 @@ layxs.prompt('请输入您的邮箱地址', function (val) {
     layxs.msg('你的邮箱地址：' + val);
 });
 ```
-> #### 特有参数
+> ##### 特有参数
 ```javascript
 {
     //文本
@@ -206,7 +206,7 @@ layxs.confirm('请问你觉得 layxs 好用吗？',function () {
     this.close();
 });
 ```
-> #### 特有参数
+> ##### 特有参数
 ```javascript
 {
     //文本
@@ -225,7 +225,7 @@ layxs.loading({
 //简易写法 参数：(文本)
 layxs.loading('加载中...');
 ```
-> #### 特有参数
+> ##### 特有参数
 ```javascript
 {
     //文本
