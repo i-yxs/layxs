@@ -1650,7 +1650,7 @@
                 }
             }
         },
-        //默认配置设置
+        //设置默认配置
         config: function (name, option) {
             var s = this;
             var obj = s.module[name];
