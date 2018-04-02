@@ -1,0 +1,205 @@
+﻿<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no" />
+    <meta name="format-detection" content="telephone=no" />
+    <title>弹出层</title>
+    <style>
+        body { max-width: 1120px; margin: 0 auto; font-size: 14px; -webkit-tap-highlight-color: transparent; font-size: 1em; }
+        .titlebox { border-style: solid; border-bottom: none; border-left: none; border-right: none; border-color: #e6e6e6; border-width: 1px; padding: 0; margin: 0; margin-top: 20px; }
+        .titlebox legend { padding: 0 10px; margin-left: 20px; font-size: 16px; }
+        .btnlist { padding: 10px; font-size: 0; }
+        .btnlist .btn { display: inline-block; margin: 10px 10px 0 0; padding: 5px 15px; line-height: 24px; border: solid 1px #ccc; font-size: 14px; border-radius: 3px; color: #333; text-decoration: none; }
+        .btnlist .btn:active { background: rgba(0,0,0,.03); border-color: #1886fe; color: #1886fe; }
+    </style>
+</head>
+<body>
+    <fieldset class="titlebox">
+        <legend>效果演示</legend>
+    </fieldset>
+    <div class="btnlist">
+        <a class="btn" data-type="msg" href="javascript:void(0)">消息提示</a>
+        <a class="btn" data-type="alert" href="javascript:void(0)">带按钮的提示</a>
+        <a class="btn" data-type="confirm" href="javascript:void(0)">询问</a>
+        <a class="btn" data-type="confirm-h" href="javascript:void(0)">询问(横排按钮)</a>
+        <a class="btn" data-type="confirm-v" href="javascript:void(0)">询问(竖排按钮)</a>
+        <a class="btn" data-type="open" href="javascript:void(0)">内容为页面元素</a>
+        <a class="btn" data-type="open-tran" href="javascript:void(0)">其它过渡效果</a>
+        <a class="btn" data-type="prompt" href="javascript:void(0)">输入框</a>
+        <a class="btn" data-type="prompt-verify" href="javascript:void(0)">输入验证</a>
+        <a class="btn" data-type="mask" href="javascript:void(0)">遮罩层</a>
+        <a class="btn" data-type="loading" href="javascript:void(0)">加载中</a>
+        <a class="btn" data-type="schedule" href="javascript:void(0)">加载进度</a>
+        <div style="text-align:center;margin-top:20px;">
+            <p><a class="btn" data-type="top-tips" href="javascript:void(0)">上tips</a></p>
+            <p><a class="btn" data-type="right-tips" href="javascript:void(0)">右tips</a></p>
+            <p><a class="btn" data-type="left-tips" href="javascript:void(0)">左tips</a></p>
+            <p><a class="btn" data-type="bottom-tips" href="javascript:void(0)">下tips</a></p>
+        </div>
+    </div>
+    <div class="popup-layer-wrapper" data-mode="tips" data-tran="popup" data-exist="0" data-show="0">
+        <div class="pl-mask-layer"></div>
+        <div class="pl-mian-wrapper" style="left:25%;top:25%;background:#fff;">
+            <div class="pl-title-bar pl-border-bottom pl-flex">
+                <div class="pl-title-text">标题名称</div>
+                <div class="pl-close-btn">
+                    <div class="pl-icon pl-icon-close"></div>
+                </div>
+            </div>
+            <div class="pl-content">
+                <div class="pl-tips" data-direc="left-top">tips</div>
+            </div>
+            <div class="pl-btn-list pl-border-top pl-flex">
+                <div class="pl-btn-item pl-border-right">确定</div>
+                <div class="pl-btn-item pl-border-right">取消</div>
+            </div>
+        </div>
+    </div>
+    <script>
+        var popupLayerWrapper = document.querySelector('.popup-layer-wrapper');
+        var plMianContent = popupLayerWrapper.querySelector('.pl-mian-wrapper');
+
+        popupLayerWrapper.remove();
+
+        //window.addEventListener('click', function () {
+        //    var exist = popupLayerWrapper.getAttribute('data-exist');
+        //    var show = popupLayerWrapper.getAttribute('data-show');
+        //    switch (exist) {
+        //        case '0':
+        //            document.body.appendChild(popupLayerWrapper);
+        //            setTimeout(function () {
+        //                popupLayerWrapper.setAttribute('data-show', 1);
+        //                popupLayerWrapper.setAttribute('data-exist', 1);
+        //            }, 10);
+        //            break;
+        //        case '1':
+        //            popupLayerWrapper.setAttribute('data-show', 0);
+        //            popupLayerWrapper.setAttribute('data-exist', 0);
+        //            break;
+        //    }
+        //});
+        plMianContent.addEventListener('transitionend', function () {
+            if (popupLayerWrapper.getAttribute('data-exist') === '0') {
+                popupLayerWrapper.remove();
+            }
+        });
+    </script>
+    <script src="../src/layxs.js"></script>
+    <script>
+        document.querySelector('.btnlist').addEventListener('click', function (e) {
+            switch (e.target.getAttribute('data-type')) {
+                case 'msg':
+                    var msg = layxs.msg('你好，欢迎使用 layxs ');
+                    break;
+                case 'alert':
+                    layxs.alert('你好，欢迎使用 layxs ');
+                    break;
+                case 'confirm':
+                    layxs.confirm('我倒，你也在网上冲浪啊，你是MM吗？');
+                    break;
+                case 'confirm-h':
+                    layxs.confirm({
+                        text: '请问你觉得 layxs 好用吗？',
+                        button: ['<font color="#999">不好用</font>', '好用'],
+                        btnEvent: [function () {
+                            this.close();
+                        }, function () {
+                            this.close();
+                        }]
+                    });
+                    break;
+                case 'confirm-v':
+                    layxs.confirm({
+                        text: '亲，给个五星好评吧！',
+                        button: ['好嘞', '残忍拒绝', '下次再说'],
+                        btnAlign: 'v',
+                        btnEvent: [function () {
+                            this.close();
+                            layxs.msg('非常感谢');
+                        }, function () {
+                            this.close();
+                        }, function () {
+                            this.close();
+                        }]
+                    });
+                    break;
+                case 'open':
+                    layxs.open(document.querySelector('.btnlist'), '效果演示');
+                    break;
+                case 'open-tran':
+                    layxs.open({
+                        area: {
+                            'width': '100%',
+                            'height': '100%',
+                            'maxWidth': '100%',
+                            'maxHeight': '100%'
+                        },
+                        title: '效果演示',
+                        content: document.querySelector('.btnlist'),
+                        tranIn: 'rihgt_left_slide',
+                        tranOut: 'rihgt_left_slide',
+                        borderRadius: 0
+                    });
+                    break;
+                case 'prompt':
+                    layxs.prompt('你叫什么名字？', function (name) {
+                        this.close();
+                        layxs.msg('你好呀，' + name);
+                    });
+                    break;
+                case 'prompt-verify':
+                    layxs.prompt({
+                        text: '请输入您的邮箱地址',
+                        verify: function (text) {
+                            if (new RegExp("^\\w+((-\\w+)|(\\.\\w+))*\\@[A-Za-z0-9]+((\\.|-)[A-Za-z0-9]+)*\\.[A-Za-z0-9]+$").test(text)) {
+                                return true;
+                            }
+                            return '邮箱地址格式不正确';
+                        },
+                        callback: function (name) {
+                            this.close();
+                            layxs.msg('你好呀，' + name);
+                        }
+                    });
+                    break;
+                case 'mask':
+                    layxs.mask('rgba(255, 0, 0, 0.5)');
+                    break;
+                case 'top-tips':
+                    layxs.tips('hello，我在上面', e.target, 'top');
+                    break;
+                case 'bottom-tips':
+                    layxs.tips('hello，我在下面', e.target, 'bottom');
+                    break;
+                case 'left-tips':
+                    layxs.tips('hello，我在左边', e.target, 'left');
+                    break;
+                case 'right-tips':
+                    layxs.tips('hello，我在右边', e.target, 'right');
+                    break;
+                case 'loading':
+                    var loadbox = layxs.loading('加载中...');
+                    setTimeout(function () {
+                        loadbox.close();
+                    }, 2000);
+                    break;
+                case 'schedule':
+                    var schedule = 0;
+                    var loadbox = layxs.loading('加载中...');
+                    (function () {
+                        schedule = Math.min(schedule + Math.round(Math.random() * 10) + 1, 100);
+                        loadbox.update({
+                            text: '加载中 ' + schedule + '%'
+                        });
+                        if (schedule >= 100) {
+                            loadbox.close();
+                        } else {
+                            setTimeout(arguments.callee, Math.round(Math.random() * 500));
+                        }
+                    })();
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>
