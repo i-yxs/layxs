@@ -342,7 +342,7 @@ layxs.open({
 //例子
 layxs.msg({
     area:{
-        width:'vw-100',
+        width:'calc(vw-100)',
     }
 });
 //翻译：设置msg弹出框的宽度为当前屏幕宽度-100
