@@ -37,54 +37,7 @@
             <p><a class="btn" data-type="bottom-tips" href="javascript:void(0)">下tips</a></p>
         </div>
     </div>
-    <div class="popup-layer-wrapper" data-mode="tips" data-tran="popup" data-exist="0" data-show="0">
-        <div class="pl-mask-layer"></div>
-        <div class="pl-mian-wrapper" style="left:25%;top:25%;background:#fff;">
-            <div class="pl-title-bar pl-border-bottom pl-flex">
-                <div class="pl-title-text">标题名称</div>
-                <div class="pl-close-btn">
-                    <div class="pl-icon pl-icon-close"></div>
-                </div>
-            </div>
-            <div class="pl-content">
-                <div class="pl-tips" data-direc="left-top">tips</div>
-            </div>
-            <div class="pl-btn-list pl-border-top pl-flex">
-                <div class="pl-btn-item pl-border-right">确定</div>
-                <div class="pl-btn-item pl-border-right">取消</div>
-            </div>
-        </div>
-    </div>
-    <script>
-        var popupLayerWrapper = document.querySelector('.popup-layer-wrapper');
-        var plMianContent = popupLayerWrapper.querySelector('.pl-mian-wrapper');
-
-        popupLayerWrapper.remove();
-
-        //window.addEventListener('click', function () {
-        //    var exist = popupLayerWrapper.getAttribute('data-exist');
-        //    var show = popupLayerWrapper.getAttribute('data-show');
-        //    switch (exist) {
-        //        case '0':
-        //            document.body.appendChild(popupLayerWrapper);
-        //            setTimeout(function () {
-        //                popupLayerWrapper.setAttribute('data-show', 1);
-        //                popupLayerWrapper.setAttribute('data-exist', 1);
-        //            }, 10);
-        //            break;
-        //        case '1':
-        //            popupLayerWrapper.setAttribute('data-show', 0);
-        //            popupLayerWrapper.setAttribute('data-exist', 0);
-        //            break;
-        //    }
-        //});
-        plMianContent.addEventListener('transitionend', function () {
-            if (popupLayerWrapper.getAttribute('data-exist') === '0') {
-                popupLayerWrapper.remove();
-            }
-        });
-    </script>
-    <script src="../src/layxs.js"></script>
+    <script src="../src/layxs-min.js"></script>
     <script>
         document.querySelector('.btnlist').addEventListener('click', function (e) {
             switch (e.target.getAttribute('data-type')) {

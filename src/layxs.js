@@ -4,7 +4,7 @@
     项目地址：https://github.com/qq597392321/layxs
 */
 (function (window) {
-    'use strict'
+    'use strict';
     var CUSTOM_DATA_KEY_NAME = 'CUSTOM_DATA_KEY_' + Date.now() + '';
     //常用功能
     var oftenFunc = {
@@ -55,7 +55,7 @@
         isType: function (obj, name) {
             var toString = Object.prototype.toString.call(obj).toLowerCase();
             if (name === undefined) {
-                return /^\[object (\w+)\]$/.exec(toString)[1];
+                return /^\[object\s(\w+)\]$/.exec(toString)[1];
             } else {
                 return toString === '[object ' + name.toLowerCase() + ']';
             }

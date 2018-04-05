@@ -15,7 +15,7 @@
 ```html
 <script src="layxs-min.js"></script>
 ```
-`注意layxs-min.css必须跟layxs-min.js在同一个目录`
+`注意layxs.css必须跟layxs-min.js在同一个目录`
 
 
 文档：
