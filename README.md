@@ -10,17 +10,17 @@
 
 使用方法：
 ---------------------------
-在页面中引用layxs-min.js
+在页面中引用layxs-min.js <br>
+`注意layxs-min.css必须跟layxs-min.js在一个目录`
 
-### 模块
 ```html
 <script src="layxs-min.js"></script>
 ```
 
 
-
 文档：
 ---------------------------
+### 模块
 
 * #### 公共配置
 ```javascript
