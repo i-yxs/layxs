@@ -11,11 +11,11 @@
 使用方法：
 ---------------------------
 在页面中引用layxs-min.js <br>
-`注意layxs-min.css必须跟layxs-min.js在一个目录`
 
 ```html
 <script src="layxs-min.js"></script>
 ```
+`注意layxs-min.css必须跟layxs-min.js在同一个目录`
 
 
 文档：
