@@ -8,10 +8,19 @@
 ![](https://github.com/qq597392321/layxs/blob/master/demo/gif/1.gif) 
 
 
+使用方法：
+---------------------------
+在页面中引用layxs-min.js
+
+### 模块
+```html
+<script src="layxs-min.js"></script>
+```
+
+
+
 文档：
 ---------------------------
-### 模块
-
 
 * #### 公共配置
 ```javascript
