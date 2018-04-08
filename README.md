@@ -162,7 +162,7 @@ layxs.alert('你好，欢迎使用 layxs ');
 layxs.prompt({
     text: '请输入您的邮箱地址',
     verify: function (val) {
-        if (val==='') {
+        if (val!=='') {
             return true;
         }
         return '邮箱地址不能为空';
