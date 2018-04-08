@@ -202,6 +202,7 @@ layxs.prompt('请输入您的邮箱地址', function (val) {
 layxs.alert({
     text:'请问你觉得 layxs 好用吗？',
     button: ['<font color="#999">不好用</font>', '好用'],
+    btnEvent: function () {
         this.close();
     }, function () {
         this.close();
