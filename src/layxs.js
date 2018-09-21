@@ -5,322 +5,396 @@
 */
 (function (window) {
     'use strict';
-    var CUSTOM_DATA_KEY_NAME = 'CUSTOM_DATA_KEY_' + Date.now() + '';
-    //常用功能
-    var oftenFunc = {
-        //获取对象指定key的值
-        get: function (obj, tier) {
-            tier = tier ? tier.split('.') : [];
+    /**
+     * 让IE浏览器支持document.currentScript
+     */
+    if (document.currentScript === undefined) {
+        document.currentScript = (function () {
+            var src = '';
+            var stack;
             try {
-                tier.forEach(function (name) {
-                    obj = obj[name];
-                });
-                return obj;
-            } catch (e) { }
+                //强制报错,以便捕获e.stack
+                a.b.c();
+            } catch (e) {
+                //safari的错误对象只有line,sourceId,sourceURL
+                stack = e.stack;
+                if (!stack && window.opera) {
+                    //opera 9没有e.stack,但有e.Backtrace,但不能直接取得,需要对e对象转字符串进行抽取
+                    stack = (String(e).match(/of linked script \S+/g) || []).join(' ');
+                }
+            }
+            if (stack) {
+                //取得最后一行,最后一个空格或@之后的部分
+                stack = stack.split(/[@ ]/g).pop();
+                stack = stack[0] == '(' ? stack.slice(1, -1) : stack;
+                //去掉行号与或许存在的出错字符起始位置
+                src = stack.replace(/(:\d+)?:\d+$/i, '');
+            } else {
+                var nodes = document.getElementsByTagName('script');
+                for (var i = 0, node; node = nodes[i++];) {
+                    if (node.readyState === 'interactive') {
+                        src = node.src;
+                        break;
+                    }
+                }
+            }
+            return { src: src };
+        })();
+    }
+    /*
+     *  常用功能
+     */
+    function oftenFunc() { };
+    oftenFunc.prototype = {
+        //获取对象指定key的值
+        get: function (obj, path) {
+            var res;
+            var reg1 = /\d+/;
+            var reg2 = /([^.\[\]]+)|(?=\[)(\d+)(?=\])/g;
+            path = path || '';
+            path.split('.').every(function (item) {
+                while (res = reg2.exec(item)) {
+                    if (obj === null || obj === undefined) {
+                        return obj = undefined, false;
+                    } else {
+                        obj = obj[res[1]];
+                    }
+                }
+                return true;
+            });
+            return obj;
         },
-        //设置对象指定key的值
-        set: function (obj, tier, value) {
-            var temp = obj;
-            tier = tier ? tier.split('.') : [];
-            tier.forEach(function (name) {
-                if (oftenFunc.isType(temp[name], 'object')) {
-                    temp = temp[name];
-                } else {
-                    temp = temp[name] = {};
+        //设置对象指定key的值(对象,属性名or属性路径,值)
+        set: function (obj, path, value) {
+            var res, prev, temp;
+            var reg1 = /\d+/;
+            var reg2 = /([^.\[\]]+)|(?=\[)(\d+)(?=\])/g;
+            path = path || '';
+            path.split('.').forEach(function (item) {
+                while (res = reg2.exec(item)) {
+                    if (temp) {
+                        //匹配到的值为数字则是数组，否则为对象
+                        if (reg1.test(res[1]) && oftenFunc.isType(temp[prev]) !== 'array') {
+                            temp[prev] = [];
+                        } else if (oftenFunc.isType(temp[prev]) !== 'object') {
+                            temp[prev] = {};
+                        }
+                        temp = temp[prev];
+                    } else {
+                        temp = obj;
+                    }
+                    prev = res[1];
                 }
             });
-            return (temp = value), obj;
+            return temp[prev] = value;
         },
-        //对象克隆
-        clone: function (obj) {
-            var newobj = null;
+        //对象克隆(克隆者,是否使用深克隆模式)
+        clone: function (obj, isDepth) {
+            var newobj;
             switch (oftenFunc.isType(obj)) {
                 case 'array':
-                    newobj = [];
-                    obj.forEach(function (item, i) {
-                        newobj[i] = oftenFunc.clone(item);
-                    });
-                    break;
+                    newobj = []; break;
                 case 'object':
                     newobj = {};
-                    Object.keys(obj).forEach(function (name) {
-                        newobj[name] = oftenFunc.clone(obj[name]);
-                    });
                     break;
-                default: return obj;
+                default:
+                    return obj;
             }
+            Object.keys(obj).forEach(function (name) {
+                if (isDepth) {
+                    newobj[name] = oftenFunc.clone(obj[name], isDepth);
+                } else {
+                    newobj[name] = obj[name];
+                }
+            });
             return newobj;
         },
         //判断指定对象的数据类型
         isType: function (obj, name) {
             var toString = Object.prototype.toString.call(obj).toLowerCase();
-            if (name === undefined) {
-                return /^\[object\s(\w+)\]$/.exec(toString)[1];
-            } else {
+            if (name) {
                 return toString === '[object ' + name.toLowerCase() + ']';
+            } else {
+                return /^\[object (\w+)\]$/.exec(toString)[1];
             }
         },
-        //数组去重
-        unique: function (list, tier) {
+        //数组去重(数组对象,比对指定路径的值)
+        unique: function (list, path) {
             var value;
-            var dellist = [];
-            var templist = [];
-            list.forEach(function (item, i) {
-                value = oftenFunc.get(item, tier);
-                if (templist.indexOf(value) > -1) {
-                    dellist.push(i);
+            var newList = [];
+            var tempList = [];
+            list.forEach(function (item, index) {
+                value = oftenFunc.get(item, path);
+                if (tempList.indexOf(value) === -1) {
+                    newList.push(item);
+                }
+                tempList.push(value);
+            });
+            return newList;
+        },
+        //对象继承(继承者,被继承者,是否继承所有属性,是否使用深继承模式)
+        extend: function (heres, byheres, isAll, isDepth) {
+            Object.keys(byheres).forEach(function (name) {
+                if (!isAll && heres[name] !== undefined) {
+                    return;
+                }
+                if (isDepth) {
+                    switch (oftenFunc.isType(byheres[name])) {
+                        case 'array':
+                            if (oftenFunc.isType(heres[name]) !== 'array') {
+                                heres[name] = [];
+                            }
+                            oftenFunc.extend(heres[name], byheres[name], isAll, isDepth);
+                            break;
+                        case 'object':
+                            if (oftenFunc.isType(heres[name]) !== 'object') {
+                                heres[name] = {};
+                            }
+                            oftenFunc.extend(heres[name], byheres[name], isAll, isDepth);
+                            break;
+                        default:
+                            heres[name] = byheres[name];
+                            break;
+                    }
                 } else {
-                    templist.push(value);
+                    heres[name] = byheres[name];
                 }
             });
-            for (var i = dellist.length - 1; i >= 0; i--) {
-                list.splice(dellist[i], 1);
-            }
-            return list;
+            return heres;
         },
-        //indexOf增强版，可以指定多级属性
-        indexOf: function (list, value, tier) {
+        //数组检索(数组对象,比对的值,比对指定路径的值)
+        indexOf: function (list, value, path) {
             var index = -1;
             list.forEach(function (item, i) {
-                if (value === oftenFunc.get(item, tier)) {
+                if (value === oftenFunc.get(item, path)) {
                     index = i;
                 }
             });
             return index;
         },
-        //对象继承(指定继承对象，指定继承自对象，当继承对象已存在属性，是否用新的值覆盖旧的值(可选，默认false))
-        extend: function (target, obj, isrep) {
-            Object.keys(obj).forEach(function (name) {
-                if (target[name] !== undefined && !isrep) return;
-                target[name] = obj[name];
-            });
+        //获取url参数
+        getParams: function (name) {
+            var res, reg = new RegExp('[?&]' + name + '=([^&=]+)', 'i');
+            if (res = reg.exec(location.search)) {
+                return RegExp.$1;
+            }
+            return '';
         },
-        //深度对象继承
-        deepExtend: function (target, obj, isrep) {
-            Object.keys(obj).forEach(function (name) {
-                if (oftenFunc.isType(obj[name], 'object') && oftenFunc.isType(target[name], 'object')) {
-                    oftenFunc.deepExtend(target[name], obj[name], isrep);
-                } else {
-                    if (target[name] !== undefined && !isrep) return;
-                    target[name] = obj[name];
+        //对象转url参数
+        toUrlParams: function (obj) {
+            var search = '';
+            Object.keys(obj).forEach(function (name, index) {
+                if (obj[name] !== undefined) {
+                    search += index ? '&' : '';
+                    search += name + '=' + obj[name];
                 }
             });
+            return search;
         },
-        //绑定上下文(指定对象，指定上下文对象)
-        bindContext: function (obj, context) {
-            var type = oftenFunc.isType(obj);
-            if (type === 'object' || type === 'function') {
-                Object.keys(obj).forEach(function (name) {
-                    switch (oftenFunc.isType(obj[name])) {
-                        case 'function':
-                            obj[name] = obj[name].bind(context);
-                            break;
-                        case 'object':
-                            oftenFunc.bindContext(obj[name], context);
-                            break;
+        //url参数转对象
+        toUrlObject: function () {
+            var url = arguments[0] || location.href;
+            var index = url.indexOf('?');
+            var jsons = {};
+            if (index > -1) {
+                var search = url.substr(index + 1, url.length).split('&');
+                search.forEach(function (item) {
+                    var strs = item.split('=');
+                    jsons[strs[0] || ''] = decodeURI(strs[1] || '');
+                });
+            }
+            return jsons;
+        },
+        //操作cookie
+        cookie: {
+            //获取cookie
+            get: function (key) {
+                var arr, reg = new RegExp('(^| )' + key + '=([^;]*)(;|$)');
+                if (arr = document.cookie.match(reg)) {
+                    return unescape(arr[2]);
+                }
+            },
+            //设置cookie，exp以小时为单位
+            set: function (key, value, exp) {
+                var date = new Date();
+                exp = (exp || 24) * 60 * 60 * 1000;
+                date.setTime(date.getTime() + exp);
+                document.cookie = key + '=' + escape(value) + ';expires=' + date.toGMTString();
+            },
+            //删除cookie
+            del: function (key) {
+                var exp = new Date();
+                var cval = this.getCookie(key);
+                exp.setTime(exp.getTime() - 1);
+                if (cval != null) {
+                    document.cookie = key + '=' + cval + ';expires=' + exp.toGMTString();
+                }
+            },
+        },
+        //操作localStorage
+        localStorage: {
+            //获取localStorage值，exp以小时为单位
+            getItem: function (key, exp) {
+                var data = JSON.parse(localStorage.getItem(key));
+                if (data && data.startdate) {
+                    exp = (exp && exp * 60 * 60 * 1000) || Infinity;
+                    if (Date.now() - data.startdate <= exp) {
+                        return JSON.parse(data.context);
+                    }
+                }
+                return null;
+            },
+            //设置localStorage值
+            setItem: function (key, value) {
+                localStorage.setItem(key, JSON.stringify({ context: value, startdate: Date.now() }));
+            },
+        },
+    };
+    oftenFunc = new oftenFunc();
+    /*
+     *  dom常用功能
+     */
+    function oftenDomFunc() {
+        var that = this;
+        //事件处理
+        that.event = {};
+        //自定义数据key名
+        that.keyName = '__custom_key_name_dom_' + Date.now() + '__';
+        //css3兼容前缀
+        that.browserPrefix = '-webkit- -moz- -o- -ms-'.split(' ');
+        //css3兼容列表
+        that.browserAttr = 'transform transition animation'.split(' ');
+        //绑定
+        that.bind = function (el) {
+            var that = this;
+            for (var name in that) {
+                if (!that.hasOwnProperty(name)) {
+                    el[name] = that[name].bind(el);
+                }
+            }
+            return el;
+        };
+        //解除绑定
+        that.unbind = function (el) {
+            var that = this;
+            for (var name in that) {
+                if (!that.hasOwnProperty(name)) {
+                    delete el[name];
+                }
+            }
+            return el;
+        };
+        //获取当前事件目标的冒泡路径，可使用选择器进行筛选
+        that.getEventAgencyTarget = function (selector) {
+            var that = this;
+            var list1 = [];
+            if (event.srcElement) {
+                var list2 = Array.prototype.slice.call(document.querySelectorAll(selector));
+                that.getParents.call(event.srcElement).forEach(function (item) {
+                    if (list2.indexOf(item) > -1) {
+                        list1.push(item);
                     }
                 });
             }
-        },
+            return list1;
+        };
     };
-    /*
-        事件推送
-    */
-    var eventPush = {
-        //注册
-        register: function (obj) {
-            var s = this;
-            var tier = CUSTOM_DATA_KEY_NAME + '.custom-event';
-            if (!oftenFunc.get(obj, tier)) {
-                oftenFunc.set(obj, tier, {});
-                obj.on = s.addEvent.bind(obj);
-                obj.off = s.removeEvent.bind(obj);
-                obj.dispatchEvent = s.dispatchEvent.bind(obj);
+    oftenDomFunc.prototype = {
+        //事件绑定
+        on: function (name, callback) {
+            var that = this;
+            var data = oftenFunc.get(that, oftenDomFunc.keyName + '.event');
+            name = name.toLowerCase();
+            data = data || oftenFunc.set(that, oftenDomFunc.keyName + '.event', {});
+            data[name] = data[name] || [];
+            data[name].push(callback);
+            if (oftenDomFunc.event[name]) {
+                oftenDomFunc.event[name].on(that, name, callback);
+            } else {
+                that.addEventListener(name, callback);
             }
+            return that;
         },
-        //取消注册
-        destroy: function (obj) {
-            var key = ['on', 'off', 'dispatchEvent'];
-            key.forEach(function (name) {
-                delete obj[name];
-            });
-        },
-        //派送事件
-        dispatchEvent: function (name, letter) {
-            var s = this;
-            var data = s[CUSTOM_DATA_KEY_NAME]['custom-event'];
-            if (oftenFunc.isType(name, 'string')) {
-                name = name.toLowerCase();
-                if (data[name]) {
-                    data[name].forEach(function (item) {
-                        item.call(s, letter);
-                    });
-                }
-                var humpName = 'on' + name[0].toUpperCase() + name.substring(1);
-                if (oftenFunc.isType(s[humpName], 'function')) {
-                    s[humpName].call(s, letter);
-                }
-            }
-        },
-        //添加事件
-        addEvent: function (name, callback) {
-            var s = this;
-            var data = s[CUSTOM_DATA_KEY_NAME]['custom-event'];
-            if (oftenFunc.isType(name, 'string') &&
-                oftenFunc.isType(callback, 'function')) {
-                name = name.toLowerCase();
-                (data[name] = data[name] || []).push(callback);
-            }
-        },
-        //删除事件
-        removeEvent: function (name, callback) {
-            var s = this;
-            var data = s[CUSTOM_DATA_KEY_NAME]['custom-event'];
-            if (oftenFunc.isType(name, 'string')) {
-                name = name.toLowerCase();
+        //解除事件绑定
+        off: function (name, callback) {
+            var that = this;
+            var data = oftenFunc.get(that, oftenDomFunc.keyName + '.event');
+            name = name.toLowerCase();
+            if (data && data[name]) {
+                data = data[name];
                 if (callback === undefined) {
-                    data[name] = [];
+                    data.forEach(function (callback) {
+                        if (oftenDomFunc.event[name]) {
+                            oftenDomFunc.event[name].off(that, name, callback);
+                        } else {
+                            that.removeEventListener(name, callback);
+                        }
+                    });
+                    data.length = 0;
                 } else {
-                    var index = data[name].indexOf(callback);
+                    var index = data.indexOf(callback);
                     if (index > -1) {
-                        data[name].splice(index, 1);
-                    }
-                }
-            }
-        }
-    };
-    //dom常用功能封装
-    var oftenDomFunc = {
-        //tap事件处理
-        tapEvent: {
-            isTouch: 'ontouchstart' in document,
-            interval: 1000,
-            threshold: 20,
-            init: function (element) {
-                element[CUSTOM_DATA_KEY_NAME]['dom-event']['tap-data'] = {
-                    'is-init': true,
-                    'is-bind': false,
-                    'down-position': null,
-                    'down-timestamp': null,
-                    'down-dispose': oftenDomFunc.tapEvent.down.bind(element),
-                    'lift-dispose': oftenDomFunc.tapEvent.lift.bind(element)
-                };
-            },
-            down: function (e) {
-                var s = this;
-                var data = s[CUSTOM_DATA_KEY_NAME]['dom-event']['tap-data'];
-                data['down-position'] = {
-                    clientX: e.changedTouches[0].clientX,
-                    clientY: e.changedTouches[0].clientY
-                };
-                data['down-timestamp'] = Date.now();
-            },
-            lift: function (e) {
-                var s = this;
-                var data = s[CUSTOM_DATA_KEY_NAME]['dom-event']['tap-data'];
-                var downpos = data['down-position'];
-                var downtime = data['down-timestamp'];
-                if (downpos) {
-                    if (Date.now() - downtime < oftenDomFunc.tapEvent.interval) {
-                        var currpos = {
-                            clientX: e.changedTouches[0].clientX,
-                            clientY: e.changedTouches[0].clientY
-                        };
-                        if (Math.abs(downpos.clientX - currpos.clientX) < oftenDomFunc.tapEvent.threshold &&
-                            Math.abs(downpos.clientY - currpos.clientY) < oftenDomFunc.tapEvent.threshold) {
-                            s[CUSTOM_DATA_KEY_NAME]['dom-event']['tap'].forEach(function (item) {
-                                item.call(s, e);
-                            });
+                        data.splice(index, 1);
+                        if (oftenDomFunc.event[name]) {
+                            oftenDomFunc.event[name].off(that, name, callback);
+                        } else {
+                            that.removeEventListener(name, callback);
                         }
                     }
-                    data['down-position'] = null;
-                    data['down-timestamp'] = null;
                 }
             }
-        },
-        //css3兼容前缀
-        browserPrefix: ['-webkit-', '-moz-', '-o-', '-ms-'],
-        //css3兼容列表
-        browserAttrList: ['transform', 'transition', 'animation', 'clipPath'],
-        //不继承方法列表
-        extendExceptList: ['browserPrefix', 'browserAttrList', 'extendExceptList', 'extend', 'destroy', 'tapEvent'],
-        //继承
-        extend: function (element) {
-            var keylist = Object.keys(oftenDomFunc);
-            oftenDomFunc.extendExceptList.forEach(function (name) {
-                keylist.splice(keylist.indexOf(name), 1);
-            });
-            keylist.forEach(function (name) {
-                element[name] = oftenDomFunc[name].bind(element);
-            });
-            //队列数据
-            oftenFunc.set(element, CUSTOM_DATA_KEY_NAME + '.dom-queue', {
-                //默认队列
-                'def': {
-                    //队列数据列表
-                    list: [],
-                    //计时器id
-                    timerid: null
-                }
-            });
-            //事件列表
-            oftenFunc.set(element, CUSTOM_DATA_KEY_NAME + '.dom-event', {});
-            return element;
-        },
-        //取消继承
-        destroy: function (element) {
-            var keylist = Object.keys(oftenDomFunc);
-            oftenDomFunc.extendExceptList.forEach(function (name) {
-                keylist.splice(keylist.indexOf(name), 1);
-            });
-            keylist.forEach(function (name) {
-                delete element[name];
-            });
+            return that;
         },
         //设置样式
         css: function () {
-            var s = this;
-            var option = arguments[0];
-            switch (oftenFunc.isType(option)) {
+            var that = this;
+            var data = {};
+            var name = arguments[0];
+            switch (oftenFunc.isType(name)) {
                 case 'string':
                     if (arguments[1] === undefined) {
-                        return oftenDomFunc.getStyle.call(s, option);
+                        var style = getComputedStyle(that, arguments[2]);
+                        if (/^([0-9.]+)px$/i.test(style[name])) {
+                            return Number(RegExp.$1);
+                        }
+                        return style[name];
                     } else {
-                        s.style[option] = arguments[1];
+                        data[name] = arguments[1];
                     }
                     break;
                 case 'object':
-                    Object.keys(option).forEach(function (name) {
-                        if (oftenDomFunc.browserAttrList.indexOf(name) > -1) {
-                            oftenDomFunc.browserPrefix.forEach(function (prefix) {
-                                s.style[prefix + name] = option[name];
-                            });
-                        }
-                        s.style[name] = option[name];
-                    });
+                    data = name;
                     break;
             }
-            return s;
+            Object.keys(data).forEach(function (name) {
+                if (oftenDomFunc.browserAttr.indexOf(name) > -1) {
+                    oftenDomFunc.browserPrefix.forEach(function (prefix) {
+                        that.style[prefix + name] = data[name];
+                    });
+                }
+                that.style[name] = data[name];
+            });
+            return that;
         },
         //设置属性
         attr: function () {
-            var s = this;
+            var that = this;
             var option = arguments[0];
             switch (oftenFunc.isType(option)) {
                 case 'string':
                     if (arguments[1] === undefined) {
-                        return s.getAttribute(option);
+                        return that.getAttribute(option);
                     } else {
-                        s.setAttribute(option, arguments[1]);
+                        that.setAttribute(option, arguments[1]);
                     }
                     break;
                 case 'object':
                     Object.keys(option).forEach(function (name) {
-                        s.setAttribute(name, option[name]);
+                        that.setAttribute(name, option[name]);
                     });
                     break;
             }
-            return s;
+            return that;
         },
         //删除自己
         remove: function () {
@@ -329,24 +403,30 @@
             }
             return this;
         },
-        //获取指定选择器的祖先元素列表
+        //获取所有祖先元素，可使用选择器进行筛选
         parents: function (selector) {
-            var s = this;
-            var list = [];
-            var path = s.getAncestor();
-            [].forEach.call(document.querySelectorAll(selector), function (item) {
-                if (path.indexOf(item) > -1) {
-                    list.push(item);
-                }
-            });
+            var that = this;
+            var list = that.getParents();
+            if (selector) {
+                var list1 = [];
+                var list2 = Array.prototype.slice.call(document.querySelectorAll(selector));
+                list.forEach(function (item) {
+                    if (list2.indexOf(item) > -1 && item !== that) {
+                        list1.push(item);
+                    }
+                });
+                return list1;
+            }
             return list;
         },
         //判断是否具有指定样式类
         hasClass: function (name) {
-            var list = this.className.split(' ');
+            var that = this;
+            var list = that.className.split(' ');
+            var lenght = list.length;
             name = name.toLowerCase();
-            for (var i = list.length - 1; i >= 0; i--) {
-                if (name = list[i].toLowerCase()) {
+            for (var i = 0; i < lenght; i++) {
+                if (name === list[i].toLowerCase()) {
                     return true;
                 }
             }
@@ -354,202 +434,499 @@
         },
         //添加样式类
         addClass: function (name) {
-            var list1 = name.split(' ');
-            var list2 = this.className.split(' ');
-            list1.forEach(function (item, i) {
-                var index = list2.indexOf(item);
-                if (index === -1) {
-                    list2.push(item);
+            var that = this;
+            var list = that.className.split(' ');
+            name.split(' ').forEach(function (item) {
+                if (list.indexOf(item) === -1) {
+                    list.push(item);
                 }
             });
-            this.className = list2.join(' ');
-            return this;
+            that.className = list.join(' ');
+            return that;
         },
         //删除样式类
         removeClass: function (name) {
-            var list1 = name.split(' ');
-            var list2 = this.className.split(' ');
-            list1.forEach(function (item) {
-                var index = list2.indexOf(item);
-                if (index > -1) {
-                    list2.splice(index, 1);
+            var that = this;
+            var list1 = [];
+            var list2 = name.split(' ');
+            that.className.split(' ').forEach(function (item) {
+                if (list2.indexOf(item) === -1) {
+                    list1.push(item);
                 }
             });
-            this.className = list2.join(' ');
-            return this;
+            that.className = list1.join(' ');
+            return that;
         },
-        //获取冒泡路径
-        getPath: function () {
-            var s = this;
-            var path = [s];
-            var node = s.parentNode;
-            while (node) {
-                path.push(node);
-                node = node.parentNode;
+        //获取祖先列表
+        getParents: function () {
+            var that = this;
+            var path = [that];
+            var parent = that.parentNode;
+            while (parent && parent !== document) {
+                path.push(parent);
+                parent = parent.parentNode;
             }
             return path;
         },
-        //获取指定样式值，像素值只会返回数字
-        getStyle: function (name, pseudoElt) {
-            var style = getComputedStyle(this, pseudoElt);
-            if (/^([0-9.]+)px$/i.test(style[name])) {
-                return Number(RegExp.$1);
-            }
-            return style[name];
-        },
-        //获取所有祖先元素
-        getAncestor: function () {
-            var s = this;
-            var list = s.getPath();
-            list.splice(0, 1);
-            return list;
-        },
         //获取下一个兄弟节点
         getNextSbiling: function () {
-            var s = this;
-            if (this.parentNode) {
-                var list = [].slice.call(this.parentNode.children);
-                var index = list.indexOf(s);
-                if (index <= list.length) {
+            var that = this;
+            if (that.parentNode) {
+                var list = Array.prototype.slice.call(that.parentNode.children);
+                var index = list.indexOf(that);
+                if (index < list.length - 1) {
                     return list[index + 1];
                 }
             }
+            return null;
         },
         //获取上一个兄弟节点
         getPreviousSbiling: function () {
-            var s = this;
-            if (this.parentNode) {
-                var list = [].slice.call(this.parentNode.children);
-                var index = list.indexOf(s);
+            var that = this;
+            if (that.parentNode) {
+                var list = Array.prototype.slice.call(that.parentNode.children);
+                var index = list.indexOf(that);
                 if (index > 0) {
                     return list[index - 1];
                 }
             }
+            return null;
         },
-        //指定选择器元素是否在当前事件冒泡路径中
-        isEventAgencyTarget: function (selector) {
-            var s = this;
-            var list = s.querySelectorAll(selector);
-            var path = oftenDomFunc.getPath.call(event.target);
-            for (var i = 0, len = list.length; i < len; i++) {
-                if (path.indexOf(list[i]) > -1) {
-                    return list[i];
-                }
-            }
-            return false;
-        },
-        //加入队列
-        queue: function () {
-            var s = this;
-            var data = s[CUSTOM_DATA_KEY_NAME]['dom-queue'];
-            //修正参数
-            var name = 'def', func, delay = 0;
-            [].forEach.call(arguments, function (item) {
-                switch (oftenFunc.isType(item)) {
-                    case 'string': name = item; break;
-                    case 'function': func = item; break;
-                    case 'number': delay = item; break;
+        //获取相对于指定父元素的位置
+        getToOffset: function (el) {
+            var that = this;
+            var offset = {
+                top: that.offsetTop,
+                left: that.offsetLeft,
+            };
+            var path = oftenDomFunc.getParents.call(that);
+            path.length = Math.max(path.indexOf(el) + 1, 0);
+            path.splice(0, 1);
+            path.forEach(function (item) {
+                //相对和绝对定位，会影响offset
+                if (/relative|absolute|fixed/.test(oftenDomFunc.css.call(item, 'position'))) {
+                    offset.top += item.offsetTop;
+                    offset.left += item.offsetLeft;
                 }
             });
-            if (func) {
-                if (!data[name]) {
-                    data[name] = { list: [], timerid: null };
-                }
-                data[name].list.push({ func: func, delay: delay });
-                //是否有延时队列正在执行
-                if (data[name].timerid === null) {
-                    s.dequeue(name);
-                }
+            offset.top -= el.offsetTop + oftenDomFunc.css.call(el, 'paddingTop');
+            offset.left -= el.offsetLeft + oftenDomFunc.css.call(el, 'paddingLeft');
+            if (el === document.body) {
+                //body的offsetTop和offsetLeft总会是0，所以需要再减去margin
+                offset.top -= oftenDomFunc.css.call(el, 'marginTop');
+                offset.left -= oftenDomFunc.css.call(el, 'marginLeft');
             }
-            return s;
+            return offset;
         },
-        //是否有延时队列正在执行
-        isqueue: function () {
-            var s = this;
-            var name = arguments[0] || 'def';
-            var data = s[CUSTOM_DATA_KEY_NAME]['dom-queue'];
-            return !!data[name].timerid;
-        },
-        //从队列最前端移除并执行一个队列函数。
-        dequeue: function () {
-            var s = this;
-            var name = arguments[0] || 'def';
-            var data = s[CUSTOM_DATA_KEY_NAME]['dom-queue'];
-            var first = data[name].list.shift();
-            if (first) {
-                data[name].timerid = setTimeout(function () {
-                    data[name].timerid = null;
-                    first.func.call(s);
-                    s.dequeue(name);
-                }, first.delay);
-            }
-            return s;
-        },
-        //清空队列
-        clearQueue: function () {
-            var s = this;
-            var name = arguments[0] || 'def';
-            var data = s[CUSTOM_DATA_KEY_NAME]['dom-queue'];
-            data[name].list = [];
-            clearTimeout(data[name].timerid);
-            return s;
-        },
-        //事件绑定
-        on: function on(name, callback) {
-            var s = this;
-            if (s[CUSTOM_DATA_KEY_NAME]) {
-                var data = s[CUSTOM_DATA_KEY_NAME]['dom-event'];
-                if (oftenFunc.isType(name) === 'string' &&
-                    oftenFunc.isType(callback) === 'function') {
-                    name = name.toLowerCase();
-                    if (name === 'tap' && !oftenDomFunc.tapEvent.isTouch) {
-                        name = 'click';
-                    }
-                    if (name === 'tap') {
-                        if (!data['tap-data']) {
-                            oftenDomFunc.tapEvent.init(s);
-                        }
-                        if (!data['tap-data']['is-bind']) {
-                            s.addEventListener('touchstart', data['tap-data']['down-dispose']);
-                            s.addEventListener('touchend', data['tap-data']['lift-dispose']);
-                        }
-                    } else {
-                        s.addEventListener(name, callback);
-                    }
-                    (data[name] = data[name] || []).push(callback);
-                }
-            }
-        },
-        //删除事件绑定
-        off: function off(name, callback) {
-            var s = this;
-            if (s[CUSTOM_DATA_KEY_NAME]) {
-                var data = s[CUSTOM_DATA_KEY_NAME]['dom-event'];
-                if (oftenFunc.isType(name) === 'string') {
-                    name = name.toLowerCase();
-                    if (callback === undefined) {
-                        data[name].forEach(function (item) {
-                            s.removeEventListener(name, item);
-                        });
-                        data[name] = [];
-                    } else {
-                        if (name === 'tap') {
-                            data['tap-data']['is-bind'] = false;
-                            s.removeEventListener('touchstart', data['tap-data']['down-dispose']);
-                            s.removeEventListener('touchend', data['tap-data']['lift-dispose']);
-                        } else {
-                            s.removeEventListener(name, callback);
-                        }
-                        var index = data[name].indexOf(callback);
-                        if (index > -1) {
-                            data[name].splice(index, 1);
-                        }
-                    }
-                }
-            }
-        }
     };
-    //字符串算式计算
+    window.oftenDomFunc = oftenDomFunc = new oftenDomFunc();
+    //tap事件处理
+    oftenDomFunc.event.tap = {
+        //手指按下到提起的最大间隔时间，超出则不触发事件
+        interval: 1000,
+        //手指按下到提起的最大移动距离，超出则不触发事件
+        threshold: 20,
+        //手指按下事件处理
+        down: function (e) {
+            var that = this;
+            var data = that[oftenDomFunc.keyName].event.$tap;
+            data.position = {
+                clientX: e.touches[0].clientX,
+                clientY: e.touches[0].clientY,
+                identifier: e.touches[0].identifier,
+            };
+            data.timestamp = Date.now();
+        },
+        //手指提起事件处理
+        lift: function (e) {
+            var that = this;
+            var data = that[oftenDomFunc.keyName].event;
+            var interval = oftenDomFunc.event.tap.interval;
+            var threshold = oftenDomFunc.event.tap.threshold;
+            if (data.$tap.position) {
+                if (Date.now() - data.$tap.timestamp < interval) {
+                    var position;
+                    if (e.changedTouches[0].identifier === data.$tap.position.identifier) {
+                        position = {
+                            clientX: e.changedTouches[0].clientX,
+                            clientY: e.changedTouches[0].clientY,
+                            identifier: e.changedTouches[0].identifier,
+                        };
+                    }
+                    if (Math.abs(data.$tap.position.clientX - position.clientX) < threshold &&
+                        Math.abs(data.$tap.position.clientY - position.clientY) < threshold) {
+                        data.tap.forEach(function (item) {
+                            item.call(that, e);
+                        });
+                    }
+                }
+                data.$tap.position = null;
+                data.$tap.timestamp = null;
+                e.preventDefault();
+            }
+        },
+        //绑定事件
+        on: function (el, name, callback) {
+            var data = el[oftenDomFunc.keyName].event;
+            if ('ontouchstart' in document) {
+                if (data.$tap === undefined) {
+                    data.$tap = {
+                        position: null,
+                        timestamp: null,
+                        downCache: oftenDomFunc.event.tap.down.bind(el),
+                        liftCache: oftenDomFunc.event.tap.lift.bind(el),
+                    };
+                    el.addEventListener('touchstart', data.$tap.downCache);
+                    el.addEventListener('touchend', data.$tap.liftCache);
+                }
+            } else {
+                el.addEventListener('click', callback);
+            }
+        },
+        //解除绑定
+        off: function (el, name, callback) {
+            var data = el[oftenDomFunc.keyName].event;
+            if ('ontouchstart' in document) {
+                if (data[name].length === 0 && data.$tap) {
+                    el.removeEventListener('touchstart', data.$tap.downCache);
+                    el.removeEventListener('touchend', data.$tap.liftCache);
+                    data.$tap = undefined;
+                }
+            } else {
+                el.removeEventListener('click', callback);
+            }
+        },
+    };
+    //拖拽事件处理
+    oftenDomFunc.event.drag = {
+        //手指按下事件处理
+        down: function (e) {
+            var that = this;
+            if (e.button) {
+                return;
+            }
+            e.preventDefault();
+            var data = that[oftenDomFunc.keyName].event;
+            if ('ontouchstart' in document) {
+                data.$drag.position = {
+                    clientX: e.touches[0].clientX,
+                    clientY: e.touches[0].clientY,
+                    timestamp: Date.now(),
+                    identifier: e.touches[0].identifier,
+                };
+            } else {
+                data.$drag.position = {
+                    clientX: e.clientX,
+                    clientY: e.clientY,
+                    timestamp: Date.now(),
+                };
+            }
+            data.$drag.movepath = [data.$drag.position];
+            data.drag.forEach(function (item) {
+                item.call(that, {
+                    state: 1,
+                    event: e,
+                    moveX: 0,
+                    moveY: 0,
+                    speed: { x: 0, y: 0 },
+                    currentTarget: that,
+                });
+            });
+        },
+        //手指移动事件处理
+        move: function (e) {
+            var that = this;
+            var data = that[oftenDomFunc.keyName].event;
+            if (data.$drag.position) {
+                var position;
+                if ('ontouchstart' in document) {
+                    Array.prototype.forEach.call(e.touches, function (item) {
+                        if (item.identifier === data.$drag.position.identifier) {
+                            position = {
+                                clientX: item.clientX,
+                                clientY: item.clientY,
+                                timestamp: Date.now(),
+                                identifier: item.identifier,
+                            };
+                        }
+                    });
+                } else {
+                    position = {
+                        clientX: e.clientX,
+                        clientY: e.clientY,
+                        timestamp: Date.now(),
+                    };
+                }
+                if (position) {
+                    data.$drag.movepath.push(position);
+                    var moveX = data.$drag.position.clientX - position.clientX,
+                        moveY = data.$drag.position.clientY - position.clientY;
+                    data.drag.forEach(function (item) {
+                        item.call(that, {
+                            state: 2,
+                            event: e,
+                            moveX: moveX,
+                            moveY: moveY,
+                            speed: { x: 0, y: 0 },
+                            currentTarget: that,
+                        });
+                    });
+                }
+                e.preventDefault();
+            }
+        },
+        //手指提起事件处理
+        lift: function (e) {
+            var that = this;
+            if (e.button) {
+                return;
+            }
+            var data = that[oftenDomFunc.keyName].event;
+            if (data.$drag.position) {
+                var position;
+                if ('ontouchstart' in document) {
+                    if (e.changedTouches[0].identifier === data.$drag.position.identifier) {
+                        position = {
+                            clientX: e.changedTouches[0].clientX,
+                            clientY: e.changedTouches[0].clientY,
+                            timestamp: Date.now(),
+                            identifier: e.changedTouches[0].identifier,
+                        };
+                    }
+                } else {
+                    position = {
+                        clientX: e.clientX,
+                        clientY: e.clientY,
+                        timestamp: Date.now(),
+                    };
+                }
+                if (position) {
+                    data.$drag.movepath.push(position);
+                    var moveX = data.$drag.position.clientX - position.clientX,
+                        moveY = data.$drag.position.clientY - position.clientY;
+                    data.drag.forEach(function (item) {
+                        item.call(that, {
+                            state: 3,
+                            event: e,
+                            moveX: moveX,
+                            moveY: moveY,
+                            speed: oftenDomFunc.event.drag.getMoveSpeed(data.$drag.movepath, 100),
+                            currentTarget: that,
+                        });
+                    });
+                }
+                data.$drag.position = null;
+                e.preventDefault();
+            }
+        },
+        //获取指定毫秒数内移动的速度(路径列表,毫秒数)
+        getMoveSpeed: function (path, time) {
+            var speed = { x: 0, y: 0 };
+            var length = path.length;
+            if (length > 1) {
+                if (Date.now() - path[length - 1].timestamp < time) {
+                    var isfind = false;
+                    var newpos = path[length - 1];
+                    var timestamp = newpos.timestamp - time;
+                    for (var i = length - 1,
+                        item,
+                        ratio,
+                        maxpos; i >= 0; i--) {
+                        item = path[i];
+                        if (item.timestamp === timestamp) {
+                            isfind = true;
+                            speed.x = newpos.clientX - item.clientX;
+                            speed.y = newpos.clientY - item.clientY;
+                            break;
+                        } else if (item.timestamp < timestamp) {
+                            isfind = true;
+                            maxpos = path[i + 1];
+                            ratio = (timestamp - item.timestamp) / (maxpos.timestamp - item.timestamp);
+                            speed.x = newpos.clientX - ((maxpos.clientX - item.clientX) * ratio + item.clientX);
+                            speed.y = newpos.clientY - ((maxpos.clientY - item.clientY) * ratio + item.clientY);
+                            break;
+                        }
+                    }
+                    if (!isfind) {
+                        ratio = (newpos.timestamp - path[0].timestamp) / time;
+                        speed.x = (newpos.clientX - path[0].clientX) / ratio;
+                        speed.y = (newpos.clientY - path[0].clientY) / ratio;
+                    }
+                }
+            }
+            return speed;
+        },
+        //绑定事件
+        on: function (el, name, callback) {
+            var data = el[oftenDomFunc.keyName].event;
+            if (data.$drag === undefined) {
+                data.$drag = {
+                    position: null,
+                    movepath: null,
+                    downCache: oftenDomFunc.event.drag.down.bind(el),
+                    moveCache: oftenDomFunc.event.drag.move.bind(el),
+                    liftCache: oftenDomFunc.event.drag.lift.bind(el),
+                };
+                if ('ontouchstart' in document) {
+                    el.addEventListener('touchstart', data.$drag.downCache);
+                    window.addEventListener('touchmove', data.$drag.moveCache);
+                    window.addEventListener('touchend', data.$drag.liftCache);
+                } else {
+                    el.addEventListener('mousedown', data.$drag.downCache);
+                    window.addEventListener('mousemove', data.$drag.moveCache);
+                    window.addEventListener('mouseup', data.$drag.liftCache);
+                }
+            }
+        },
+        //解除绑定
+        off: function (el, name, callback) {
+            var data = el[oftenDomFunc.keyName].event;
+            if (data.$drag) {
+                if ('ontouchstart' in document) {
+                    el.removeEventListener('touchstart', data.$drag.downCache);
+                    window.removeEventListener('touchmove', data.$drag.moveCache);
+                    window.removeEventListener('touchend', data.$drag.liftCache);
+                } else {
+                    el.removeEventListener('mousedown', data.$drag.downCache);
+                    window.removeEventListener('mousemove', data.$drag.moveCache);
+                    window.removeEventListener('mouseup', data.$drag.liftCache);
+                }
+            }
+            data.$drag = undefined;
+        },
+    };
+    //滚轮事件处理
+    oftenDomFunc.event.wheel = {
+        //当前环境是否为火狐浏览器
+        isFirefox: /(firefox)\/([\w.]+)/i.test(navigator.userAgent),
+        //鼠标滚轮事件处理
+        wheel: function (e) {
+            var that = this;
+            var data = that[oftenDomFunc.keyName].event;
+            var wheelDeltaX = e.wheelDeltaX || 0;
+            var wheelDeltaY = e.wheelDeltaY || 0;
+            var wheelDeltaZ = e.wheelDeltaZ || 0;
+            if (oftenDomFunc.event.wheel.isFirefox) {
+                wheelDeltaY = (-e.detail) || 0;
+            }
+            if (wheelDeltaX > 0) { wheelDeltaX = -1 }
+            else if (wheelDeltaX < 0) { wheelDeltaX = 1 }
+            if (wheelDeltaY > 0) { wheelDeltaY = -1 }
+            else if (wheelDeltaY < 0) { wheelDeltaY = 1 }
+            if (wheelDeltaZ > 0) { wheelDeltaZ = -1 }
+            else if (wheelDeltaZ < 0) { wheelDeltaZ = 1 }
+            data.wheel.forEach(function (item) {
+                item.call(that, {
+                    event: e,
+                    clientX: e.clientX,
+                    clientY: e.clientY,
+                    wheelDeltaX: wheelDeltaX,
+                    wheelDeltaY: wheelDeltaY,
+                    wheelDeltaZ: wheelDeltaZ,
+                    currentTarget: that,
+                });
+            });
+        },
+        //绑定事件
+        on: function (el, name, callback) {
+            var data = el[oftenDomFunc.keyName].event;
+            if (data.$tap === undefined) {
+                data.$tap = {
+                    wheelCache: oftenDomFunc.event.wheel.wheel.bind(el),
+                };
+                if (oftenDomFunc.event.wheel.isFirefox) {
+                    el.addEventListener('DOMMouseScroll', data.$tap.wheelCache);
+                } else {
+                    el.addEventListener('mousewheel', data.$tap.wheelCache);
+                }
+            }
+        },
+        //解除绑定
+        off: function (el, name, callback) {
+            var data = el[oftenDomFunc.keyName].event;
+            if (data.$wheel) {
+                if (oftenDomFunc.event.wheel.isFirefox) {
+                    el.removeEventListener('DOMMouseScroll', data.$wheel.wheelCache);
+                } else {
+                    el.removeEventListener('mousewheel', data.$wheel.wheelCache);
+                }
+                data.$wheel = undefined;
+            }
+        },
+    };
+    /*
+     *  事件推送
+     */
+    function EventPush() { };
+    EventPush.prototype = {
+        //自定义数据key名
+        keyName: '__custom_key_name_event_' + Date.now() + '__',
+        //注册事件推送
+        add: function (obj) {
+            var that = this;
+            oftenFunc.set(obj, that.keyName + '.event', {});
+            obj.on = that.addEvent.bind(obj);
+            obj.off = that.removeEvent.bind(obj);
+            obj.emit = that.dispatchEvent.bind(obj);
+        },
+        //添加事件
+        addEvent: function (name, callback) {
+            var that = this;
+            var data = that[EventPush.keyName].event;
+            name = name.toLowerCase();
+            data[name] = data[name] || [];
+            data[name].push(callback);
+            //通知注册目标进行了添加事件操作
+            that.emit('$on', {
+                name: name,
+                callback: callback
+            });
+            return that;
+        },
+        //删除事件
+        removeEvent: function (name, callback) {
+            var that = this;
+            var data = that[EventPush.keyName].event[name.toLowerCase()];
+            if (data) {
+                //如果没有传入回调函数，则删除所有事件
+                if (callback === undefined) {
+                    data.length = 0;
+                } else {
+                    var index = data.indexOf(callback);
+                    if (index > -1) {
+                        data.splice(index, 1);
+                    }
+                }
+                //通知注册目标进行了删除事件操作
+                that.emit('$off', {
+                    name: name,
+                    callback: callback
+                });
+            }
+            return that;
+        },
+        //发送事件
+        dispatchEvent: function (name, letter, isHump) {
+            var that = this;
+            var data = that[EventPush.keyName].event[name.toLowerCase()];
+            if (data) {
+                data.forEach(function (item) {
+                    item.call(that, letter);
+                });
+            }
+            //派送驼峰写法的事件
+            if (isHump) {
+                var humpName = 'on' + name[0].toUpperCase() + name.toLowerCase().substring(1);
+                that[humpName].call(that, letter);
+            }
+            return that;
+        },
+    };
+    EventPush = new EventPush();
+    EventPush.add(EventPush);
+    /*
+     *  字符串算式计算
+     */
     var equation = {
         unit: {
             vw: 'window.innerWidth',
@@ -565,935 +942,649 @@
                 });
             }
             try {
-                return eval(exp);
+                return Number(eval(exp));
             } catch (e) {
                 return NaN;
             }
         }
     };
     /*
-        弹出层
-    */
+     *  弹出层
+     */
     function Layer(option) {
-        var s = this;
-        //绑定上下文
-        s.show = s.show.bind(s);
-        s.close = s.close.bind(s);
-        s.update = s.update.bind(s);
-        s.destroy = s.destroy.bind(s);
-        s.closeto = s.closeto.bind(s);
-        s.updateConfig = s.updateConfig.bind(s);
-        s.updatePosition = s.updatePosition.bind(s);
+        var that = this;
         //注册监听器
-        eventPush.register(s);
+        EventPush.add(that);
         //计时器列表
-        s.timerlist = {};
+        that.timerlist = {};
         //元素缓存
-        s.elementCache = {};
+        that.elementCache = {};
         //当前配置
-        s.currentConfig = oftenFunc.clone(s.defaultConfig);
+        that.currentConfig = oftenFunc.clone(that.defaultConfig, true);
+        oftenFunc.extend(that.currentConfig, option, true, true);
         //生成元素
         var wrapper = document.createElement('div');
-        wrapper.innerHTML = ' \
-            <div class="popup-layer-wrapper" data-show="0">\
-                <div class="pl-mask-layer"></div>\
-                <div class="pl-mian-wrapper">\
-                    <div class="pl-title-bar pl-border-bottom pl-flex">\
-                        <div class="pl-title-text"></div>\
-                        <div class="pl-close-btn"><div class="pl-icon pl-icon-close"></div></div>\
+        wrapper.innerHTML = '\
+            <div class="layxs-layer-wrap" data-show="0">\
+                <div class="ly-mask-wrap"></div>\
+                <div class="ly-view-wrap ly-flex">\
+                    <div class="ly-head-wrap ly-flex">\
+                        <div class="ly-title"></div>\
+                        <div class="ly-close"></div>\
                     </div>\
-                    <div class="pl-content"></div>\
-                    <div class="pl-btn-list pl-flex"></div>\
+                    <div class="ly-body-wrap"></div>\
+                    <div class="ly-func-wrap"></div>\
                 </div>\
             </div>\
         ';
-        s.elementCache['popup-layer-wrapper'] = oftenDomFunc.extend(wrapper.querySelector('.popup-layer-wrapper'));
-        s.elementCache['pl-mask-layer'] = oftenDomFunc.extend(wrapper.querySelector('.pl-mask-layer'));
-        s.elementCache['pl-mian-wrapper'] = oftenDomFunc.extend(wrapper.querySelector('.pl-mian-wrapper'));
-        s.elementCache['pl-title-bar'] = oftenDomFunc.extend(wrapper.querySelector('.pl-title-bar'));
-        s.elementCache['pl-title-text'] = oftenDomFunc.extend(wrapper.querySelector('.pl-title-text'));
-        s.elementCache['pl-close-btn'] = oftenDomFunc.extend(wrapper.querySelector('.pl-close-btn'));
-        s.elementCache['pl-content'] = oftenDomFunc.extend(wrapper.querySelector('.pl-content'));
-        s.elementCache['pl-btn-list'] = oftenDomFunc.extend(wrapper.querySelector('.pl-btn-list'));
-        s.elementCache['popup-layer-wrapper'].remove();
+        that.elementCache['mask'] = oftenDomFunc.bind(wrapper.querySelector('.ly-mask-wrap'));
+        that.elementCache['view'] = oftenDomFunc.bind(wrapper.querySelector('.ly-view-wrap'));
+        that.elementCache['head'] = oftenDomFunc.bind(wrapper.querySelector('.ly-head-wrap'));
+        that.elementCache['title'] = oftenDomFunc.bind(wrapper.querySelector('.ly-title'));
+        that.elementCache['close'] = oftenDomFunc.bind(wrapper.querySelector('.ly-close'));
+        that.elementCache['body'] = oftenDomFunc.bind(wrapper.querySelector('.ly-body-wrap'));
+        that.elementCache['func'] = oftenDomFunc.bind(wrapper.querySelector('.ly-func-wrap'));
+        that.elementCache['layer'] = oftenDomFunc.bind(wrapper.querySelector('.layxs-layer-wrap'));
         //绑定事件
-        s.elementCache['pl-mask-layer'].on('tap', function () {
-            if (s.currentConfig.tapMaskClose) {
-                s.close();
+        that.elementCache['close'].on('tap', function () {
+            that.close();
+        });
+        that.elementCache['mask'].on('tap', function () {
+            if (that.currentConfig.tapMaskClose) {
+                that.close();
             }
         });
-        s.elementCache['pl-close-btn'].on('tap', function () {
-            s.close();
-        });
-        s.elementCache['pl-btn-list'].on('tap', function () {
-            var _this = s.elementCache['pl-btn-list'].isEventAgencyTarget('.pl-btn-item');
-            if (_this) {
-                var index = _this.getAttribute('data-index');
-                var callback = s.currentConfig.btnEvent[index];
-                if (oftenFunc.isType(callback) === 'function') {
-                    callback.call(s);
+        that.elementCache['func'].on('tap', function () {
+            if (that.currentConfig.btnEvent) {
+                var el = oftenDomFunc.getEventAgencyTarget('.ly-btn')[0];
+                if (el) {
+                    var index = Number(el.getAttribute('data-index'));
+                    that.currentConfig.btnEvent.call(that, index);
                 }
             }
         });
-        s.elementCache['pl-mian-wrapper'].on('transitionend', function () {
-            if (s.elementCache['popup-layer-wrapper'].getAttribute('data-show') === '0') {
-                s.closeto();
-            }
+        oftenDomFunc.on.call(window, 'resize', function () {
+            that.updatePosition();
         });
-        s.elementCache['pl-mask-layer'].on('transitionend', function () {
-            if (s.elementCache['popup-layer-wrapper'].getAttribute('data-show') === '0' &&
-                s.currentConfig.content === null) {
-                s.closeto();
-            }
-        });
-        window.addEventListener('resize', s.updatePosition);
+        //是否关闭其他弹框
+        if (that.currentConfig.isCloseOther) {
+            layxs.close();
+        }
     };
-    //凭证
-    Layer.prototype.evidence = { explain: '用于验证非自己的凭证' };
     //显示
-    Layer.prototype.show = function () {
-        var s = this;
-        s.timerlist['show'] = Date.now();
-        s.elementCache['popup-layer-wrapper'].attr('data-show', 1);
-        return s;
+    Layer.prototype.show = function (option) {
+        var that = this;
+        that.update(option);
+        that.elementCache['layer'].attr('data-show', 1);
+        that.timerlist['show'] = Date.now();
+        return that;
     };
     //关闭
     Layer.prototype.close = function () {
-        var s = this;
-        s.dispatchEvent('close');
-        clearTimeout(clearTimeout(s.timerlist['duration']));
-        if (s.currentConfig.tranOut && Date.now() - s.timerlist['show'] > 50) {
-            s.elementCache['popup-layer-wrapper'].attr('data-tran', s.currentConfig.tranOut);
+        var that = this;
+        //停止自动关闭计时器
+        clearTimeout(that.timerlist['duration']);
+        if (that.elementCache['layer'].attr('data-show') == 1 && that.currentConfig.transition) {
+            that.elementCache['layer'].attr('data-show', 0).on('transitionend', function () {
+                that.close()
+            });
         } else {
-            s.closeto();
-        }
-        s.elementCache['popup-layer-wrapper'].attr('data-show', 0);
-        return s;
-    };
-    //关闭完成时处理
-    Layer.prototype.closeto = function () {
-        var s = this;
-        s.dispatchEvent('closeto');
-        if (s.elementCache.isCloseAfteDestroy) {
-            s.destroy();
-        }
-        if (s.elementCache['content-parent-node']) {
-            if (s.elementCache['content-next-sbiling-node']) {
-                s.elementCache['content-parent-node'].insertBefore(s.elementCache['content-node'], s.elementCache['content-next-sbiling-node']);
-            } else {
-                s.elementCache['content-parent-node'].appendChild(s.elementCache['content-node']);
+            if (that.currentConfig.isCloseAfteDestroy) {
+                that.destroy();
             }
+            if (that.elementCache['content-parent-node']) {
+                if (that.elementCache['content-next-sbiling-node']) {
+                    that.elementCache['content-parent-node'].insertBefore(that.elementCache['content-node'], that.elementCache['content-next-sbiling-node']);
+                } else {
+                    that.elementCache['content-parent-node'].appendChild(that.elementCache['content-node']);
+                }
+            }
+            that.elementCache['content-node'] = null;
+            that.elementCache['content-parent-node'] = null;
+            that.elementCache['content-next-sbiling-node'] = null;
+            that.elementCache['layer'].off('transitionend');
         }
-        s.elementCache['content-node'] = null;
-        s.elementCache['content-parent-node'] = null;
-        s.elementCache['content-next-sbiling-node'] = null;
-        s.elementCache['popup-layer-wrapper'].remove();
-        return s;
+        that.emit('close');
+        return that;
     };
     //更新
     Layer.prototype.update = function (option) {
-        var s = this;
-        oftenFunc.deepExtend(s.currentConfig, option, true);
-        //推送事件
-        s.dispatchEvent('update');
-        //更新配置
-        s.updateConfig();
-        //加入body
-        if (!s.elementCache['popup-layer-wrapper'].parentNode) {
-            s.currentConfig.parentContainer.appendChild(s.elementCache['popup-layer-wrapper']);
+        var that = this;
+        if (option) {
+            oftenFunc.extend(that.currentConfig, option, true, true);
         }
-        s.updatePosition();
-        return s;
+        that.emit('updatebefore');
+        that.updateConfig(); 
+        var parentElement = that.currentConfig.parentElement === window ? document.body : that.currentConfig.parentElement;
+        if (that.elementCache['layer'].parentNode !== parentElement) {
+            parentElement.appendChild(that.elementCache['layer']);
+        }
+        that.updatePosition();
+        return that;
     };
     //销毁
     Layer.prototype.destroy = function () {
-        var s = this;
-        s.elementCache['pl-mask-layer'].off('tap');
-        s.elementCache['pl-close-btn'].off('tap');
-        s.elementCache['pl-btn-list'].off('tap');
-        s.elementCache['pl-mian-wrapper'].off('transitionend');
-        window.removeEventListener('resize', s.updatePosition);
-        s.elementCache['popup-layer-wrapper'].remove();
-        return s;
+        var that = this;
+        that.elementCache['mask'].off('tap');
+        that.elementCache['func'].off('tap');
+        that.elementCache['close'].off('tap');
+        that.elementCache['layer'].remove();
+        oftenDomFunc.off.call(window, 'resize');
+        return that;
     };
     //更新当前配置
     Layer.prototype.updateConfig = function () {
-        var s = this;
-        var config = s.currentConfig;
+        var that = this;
+        var config = that.currentConfig;
         if (config.title === null) {
-            s.elementCache['pl-title-bar'].addClass('pl-hide');
+            that.elementCache['head'].addClass('ly-hide');
         } else {
-            s.elementCache['pl-title-text'].innerHTML = config.title;
-            s.elementCache['pl-title-bar'].removeClass('pl-hide');
+            that.elementCache['title'].innerHTML = config.title;
+            that.elementCache['head'].removeClass('ly-hide');
         }
         if (config.isCloseBtn) {
-            s.elementCache['pl-close-btn'].removeClass('pl-hide');
+            that.elementCache['close'].removeClass('ly-hide');
         } else {
-            s.elementCache['pl-close-btn'].addClass('pl-hide');
+            that.elementCache['close'].addClass('ly-hide');
         }
-        if (config.content !== s.evidence) {
-            if (config.content === null) {
-                s.elementCache['pl-mian-wrapper'].addClass('pl-hide');
-            } else if (config.content !== s.elementCache['content-node']) {
-                if (config.content.nodeType === 1) {
-                    s.elementCache['content-node'] = config.content;
-                    s.elementCache['content-parent-node'] = config.content.parentNode;
-                    s.elementCache['content-next-sbiling-node'] = oftenDomFunc.getNextSbiling.call(config.content);
-                    s.elementCache['pl-content'].appendChild(config.content);
-                } else {
-                    s.elementCache['pl-content'].innerHTML = config.content;
-                }
-                s.elementCache['pl-mian-wrapper'].removeClass('pl-hide');
+        if (config.content === null) {
+            that.elementCache['view'].addClass('ly-hide');
+        } else if (config.content !== that.elementCache['content-node']) {
+            if (config.content.nodeType === 1) {
+                that.elementCache['content-node'] = config.content;
+                that.elementCache['content-parent-node'] = config.content.parentNode;
+                that.elementCache['content-next-sbiling-node'] = oftenDomFunc.getNextSbiling.call(config.content);
+                that.elementCache['body'].appendChild(config.content);
+            } else if (typeof config.content === 'object') {
+                that.elementCache['body'].innerHTML = JSON.stringify(config.content);
+            } else {
+                that.elementCache['body'].innerHTML = config.content;
             }
+            that.elementCache['view'].removeClass('ly-hide');
         }
         if (config.boxback) {
-            s.elementCache['pl-mian-wrapper'].css('background', config.boxback);
+            that.elementCache['view'].css('background', config.boxback);
         } else {
-            s.elementCache['pl-mian-wrapper'].css('background', '#fff');
+            that.elementCache['view'].css('background', '#fff');
         }
         if (config.button) {
             var html = '';
             config.button.forEach(function (item, i) {
-                html += '<div data-index="' + i + '" class="pl-btn-item pl-border-top pl-border-right">' + item + '</div>';
+                html += '<div data-index="' + i + '" class="ly-btn">' + item + '</div>';
             });
-            s.elementCache['pl-btn-list'].removeClass('pl-hide').innerHTML = html;
+            that.elementCache['func'].removeClass('ly-hide').innerHTML = html;
         } else {
-            s.elementCache['pl-btn-list'].addClass('pl-hide');
+            that.elementCache['func'].addClass('ly-hide');
         }
         if (config.isMask) {
-            s.elementCache['pl-mask-layer'].style.backgroundColor = config.maskColor;
-            s.elementCache['pl-mask-layer'].removeClass('pl-hide');
+            that.elementCache['mask'].style.backgroundColor = config.maskColor;
+            that.elementCache['mask'].removeClass('ly-hide');
         } else {
-            s.elementCache['pl-mask-layer'].addClass('pl-hide');
+            that.elementCache['mask'].addClass('ly-hide');
         }
-        switch (config.btnAlign) {
-            case 'h':
-                s.elementCache['pl-btn-list'].addClass('pl-flex');
-                break;
-            case 'v':
-                s.elementCache['pl-btn-list'].removeClass('pl-flex');
-                break;
-        }
-        s.elementCache['pl-content'].attr('data-scroll', config.isScroll ? 1 : 0);
-        s.elementCache['pl-mian-wrapper'].css('border-radius', config.borderRadius);
-        s.elementCache['popup-layer-wrapper'].attr({
+        that.elementCache['func'].attr('data-align', config.btnAlign);
+        that.elementCache['view'].css('border-radius', config.borderRadius);
+        that.elementCache['layer'].attr({
             'data-mode': config.module,
-            'data-tran': config.tranIn
+            'data-transition': config.transition
         });
         if (config.duration) {
-            clearTimeout(s.timerlist['duration']);
-            s.timerlist['duration'] = setTimeout(function () {
-                s.close();
+            clearTimeout(that.timerlist['duration']);
+            that.timerlist['duration'] = setTimeout(function () {
+                that.close();
             }, config.duration);
         }
-        return s;
+        return that;
     };
     //更新显示位置
     Layer.prototype.updatePosition = function () {
-        var s = this;
-        var config = s.currentConfig;
-        var arearect = {};
-        var calc_reg = 'calc\\((\\S+)\\)';
-        var percent_reg = '(([+-]?)\\d+)%$';
-        var number_reg = '^(([+-]?)\\d*\\.?\\d+)$';
-        var fixedHeight = s.elementCache['pl-title-bar'].clientHeight + s.elementCache['pl-btn-list'].clientHeight;
-
-        s.elementCache['pl-mian-wrapper'].css({ top: '', left: '', width: '', height: '' });
-        s.elementCache['pl-content'].css({ top: '', left: '', width: '', height: '' });
-
+        var that = this;
+        var config = that.currentConfig;
+        var area = {};
+        var reg1 = '(\\d+)%$';
+        var reg2 = 'calc\\((\\S+)\\)';
+        var reg3 = '^(([+-]?)\\d*\\.?\\d+)$';
+        var parseValue = function (value, maxSize, rule) {
+            if (new RegExp(reg3).test(value)) {
+                return Number(RegExp.$1);
+            } else if (new RegExp(reg2, 'ig').test(value)) {
+                return equation.calc(RegExp.$1, rule);
+            } else if (new RegExp(reg1).test(value)) {
+                return RegExp.$1 / 100 * maxSize;
+            }
+        };
+        //使用元素克隆对象计算位置
+        var replica = that.elementCache['layer'].cloneNode(true);
+        var replicaView = replica.querySelector('.ly-view-wrap');
+        var parentElement = that.currentConfig.parentElement === window ? document.body : that.currentConfig.parentElement;
+        oftenDomFunc.attr.call(replica, { 'data-show': 1 });
+        oftenDomFunc.css.call(replicaView, { top: 0, left: 0, width: 'auto', height: 'auto', transition: 'none', });
+        parentElement.insertBefore(replica, parentElement.firstChild);
         //最小宽度
-        if (new RegExp(number_reg).test(config.area.minWidth)) {
-            arearect.minWidth = Number(RegExp.$1);
-        } else if (new RegExp(calc_reg, 'ig').test(config.area.minWidth)) {
-            arearect.minWidth = equation.calc(RegExp.$1) || s.elementCache['pl-content'].clientWidth;
-        } else if (new RegExp(percent_reg).test(config.area.minWidth)) {
-            arearect.minWidth = window.innerWidth * (Number(RegExp.$1) / 100);
-        } else {
-            arearect.minWidth = -Infinity;
-        }
-        //最小高度
-        if (new RegExp(number_reg).test(config.area.minHeight)) {
-            arearect.minHeight = Number(RegExp.$1);
-        } else if (new RegExp(calc_reg, 'ig').test(config.area.minHeight)) {
-            arearect.minHeight = equation.calc(RegExp.$1) - fixedHeight || s.elementCache['pl-content'].clientHeight;
-        } else if (new RegExp(percent_reg).test(config.area.minHeight)) {
-            arearect.minHeight = window.innerWidth * (Number(RegExp.$1) / 100) - fixedHeight;
-        } else {
-            arearect.minHeight = -Infinity;
-        }
-        //最大宽度
-        if (new RegExp(number_reg).test(config.area.maxWidth)) {
-            arearect.maxWidth = Number(RegExp.$1);
-        } else if (new RegExp(calc_reg, 'ig').test(config.area.maxWidth)) {
-            arearect.maxWidth = equation.calc(RegExp.$1) || window.innerWidth;
-        } else if (new RegExp(percent_reg).test(config.area.maxWidth)) {
-            arearect.maxWidth = window.innerWidth * (Number(RegExp.$1) / 100);
-        } else {
-            arearect.maxWidth = window.innerWidth;
-        }
-        //最大高度
-        if (new RegExp(number_reg).test(config.area.maxHeight)) {
-            arearect.maxHeight = Number(RegExp.$1);
-        } else if (new RegExp(calc_reg, 'ig').test(config.area.maxHeight)) {
-            arearect.maxHeight = equation.calc(RegExp.$1) - fixedHeight || window.innerHeight;
-        } else if (new RegExp(percent_reg).test(config.area.maxHeight)) {
-            arearect.maxHeight = window.innerHeight * (Number(RegExp.$1) / 100) - fixedHeight;
-        } else {
-            arearect.maxHeight = window.innerHeight;
-        }
-        if (arearect.minWidth > arearect.maxWidth) {
-            arearect.minWidth = arearect.maxWidth;
-        }
-        if (arearect.minHeight > arearect.maxHeight) {
-            arearect.minHeight = arearect.maxHeight;
-        }
+        area.minWidth = parseValue(config.area.minWidth, window.innerWidth) || 0;
+        area.minHeight = parseValue(config.area.minHeight, window.innerHeight) || 0;
+        area.maxWidth = parseValue(config.area.maxWidth, window.innerWidth) || window.innerWidth;
+        area.maxHeight = parseValue(config.area.maxHeight, window.innerHeight) || window.innerHeight;
+        area.minWidth = Math.min(area.minWidth, area.maxWidth);
+        area.minHeight = Math.min(area.minHeight, area.maxHeight);
+        area.maxWidth = Math.max(area.minWidth, area.maxWidth);
+        area.maxHeight = Math.max(area.minHeight, area.maxHeight);
         //宽度
         switch (config.area.width) {
             case 'full':
-                arearect.width = window.innerWidth;
+                area.width = window.innerWidth;
                 break;
             default:
-                if (new RegExp(number_reg).test(config.area.width)) {
-                    arearect.width = Number(RegExp.$1);
-                } else if (new RegExp(calc_reg, 'ig').test(config.area.width)) {
-                    arearect.width = equation.calc(RegExp.$1);
-                } else if (new RegExp(percent_reg).test(config.area.width)) {
-                    arearect.width = window.innerWidth * (Number(RegExp.$1) / 100);
-                }
+                area.width = parseValue(config.area.width, window.innerWidth) || replicaView.clientWidth;
                 break;
         }
-        if (!arearect.width) {
-            arearect.width = s.elementCache['pl-content'].clientWidth;
-            arearect.isAutoWidth = true;
-        }
-        if (arearect.isAutoWidth) {
-            if (arearect.width < arearect.minWidth || arearect.width > arearect.maxWidth) {
-                arearect.width = Math.max(Math.min(arearect.width, arearect.maxWidth), arearect.minWidth);
-                s.elementCache['pl-mian-wrapper'].css('width', arearect.width + 'px');
-            }
-        } else {
-            arearect.width = Math.max(Math.min(arearect.width, arearect.maxWidth), arearect.minWidth);
-            s.elementCache['pl-mian-wrapper'].css('width', arearect.width + 'px');
-        }
+        //宽度可能回出现浮点数，但是clientWidth只能获取整数，所以这里统一加1
+        area.width = Math.max(Math.min(area.width, area.maxWidth), area.minWidth) + 1;
+        replicaView.style.width = area.width + 'px';
         //高度
         switch (config.area.height) {
             case 'full':
-                arearect.height = window.innerHeight;
+                area.height = window.innerHeight;
                 break;
             default:
-                if (new RegExp(number_reg).test(config.area.height)) {
-                    arearect.height = Number(RegExp.$1);
-                } else if (new RegExp(calc_reg, 'ig').test(config.area.height)) {
-                    arearect.height = equation.calc(RegExp.$1) - fixedHeight;
-                } else if (new RegExp(percent_reg).test(config.area.height)) {
-                    arearect.height = window.innerHeight * (Number(RegExp.$1) / 100) - fixedHeight;
-                }
+                area.height = parseValue(config.area.height, window.innerHeight) || replicaView.clientHeight;
                 break;
         }
-        if (!arearect.height) {
-            arearect.height = s.elementCache['pl-content'].clientHeight;
-            arearect.isAutoHeight = true;
-        }
-        if (arearect.isAutoHeight) {
-            if (arearect.height < arearect.minHeight || arearect.height > arearect.maxHeight) {
-                arearect.height = Math.max(Math.min(arearect.height, arearect.maxHeight), arearect.minHeight);
-                s.elementCache['pl-content'].css('height', arearect.height + 'px');
-            }
-        } else {
-            arearect.height = Math.max(Math.min(arearect.height, arearect.maxHeight), arearect.minHeight);
-            s.elementCache['pl-content'].css('height', arearect.height + 'px');
-        }
+        area.height = Math.max(Math.min(area.height, area.maxHeight), area.minHeight);
+        replicaView.style.height = area.height + 'px';
         //水平定位
         switch (config.area.h) {
             case 'left':
-                arearect.left = 0;
+                area.left = 0;
                 break;
             case 'right':
-                arearect.left = window.innerWidth - arearect.width;
+                area.left = window.innerWidth - area.width;
                 break;
             default:
-                if (new RegExp(number_reg).test(config.area.h)) {
-                    arearect.left = Number(RegExp.$1);
-                } else if (new RegExp(calc_reg, 'ig').test(config.area.h)) {
-                    arearect.left = equation.calc(RegExp.$1, {
-                        'bw': arearect.width,
-                        'left': 0,
-                        'right': window.innerWidth - arearect.width
-                    }) || window.innerWidth / 2 - arearect.width / 2;
-                } else if (new RegExp(percent_reg).test(config.area.h)) {
-                    arearect.left = window.innerWidth * (Number(RegExp.$1) / 100);
-                } else {
-                    arearect.left = window.innerWidth / 2 - arearect.width / 2;
-                }
+                area.left = parseValue(config.area.h, window.innerWidth, {
+                    'bw': area.width,
+                    'left': 0,
+                    'right': window.innerWidth - area.width
+                }) || 0;
+                area.left -= area.width / 2;
                 break;
         }
         //垂直定位
         switch (config.area.v) {
             case 'top':
-                arearect.top = 0;
+                area.top = 0;
                 break;
             case 'bottom':
-                arearect.top = window.innerHeight - arearect.height - fixedHeight;
+                area.top = window.innerHeight - area.height;
                 break;
             default:
-                if (new RegExp(number_reg).test(config.area.v)) {
-                    arearect.top = Number(RegExp.$1);
-                } else if (new RegExp(calc_reg, 'ig').test(config.area.v)) {
-                    arearect.top = equation.calc(RegExp.$1, {
-                        'bh': arearect.height + fixedHeight,
-                        'top': 0,
-                        'bottom': window.innerHeight - arearect.height
-                    }) || window.innerHeight / 2 - (arearect.height + fixedHeight) / 2;
-                } else if (new RegExp(percent_reg).test(config.area.v)) {
-                    arearect.top = window.innerHeight * (Number(RegExp.$1) / 100);
-                } else {
-                    arearect.top = window.innerHeight / 2 - (arearect.height + fixedHeight) / 2;
-                }
+                area.top = parseValue(config.area.v, window.innerHeight, {
+                    'bh': area.height,
+                    'top': 0,
+                    'bottom': window.innerHeight - area.height
+                }) || 0;
+                area.top -= area.height / 2;
                 break;
         }
-        s.elementCache['pl-mian-wrapper'].css({
-            top: arearect.top + 'px',
-            left: arearect.left + 'px'
+        that.emit('updateing', {
+            rect: area,
+            view: replicaView,
         });
-        return s;
+        oftenDomFunc.remove.call(replica);
+        that.elementCache['view'].css({
+            top: area.top + 'px',
+            left: area.left + 'px',
+            width: area.width + 'px',
+            height: area.height + 'px',
+        });
+        return that;
     };
     //默认配置
-    Layer.prototype.defaultConfig = (function () {
-        return {
-            //模块
-            module: '',
-            //标题
-            title: null,
-            //内容
-            content: null,
-            //背景
-            boxback: '#fff',
-            //圆角
-            borderRadius: '8px',
-            //显示的时间(number:毫秒|false:一直显示)
-            duration: 0,
-            //按钮列表 Array(string|number,...)
-            button: null,
-            //按钮事件列表 Array(function,...)
-            btnEvent: null,
-            //按钮排列方式 String('h'：横排 | 'v'：竖排)
-            btnAlign: 'h',
-            /*
-                指定显示的区域 Object
-                    v(垂直坐标位置)：number |
-                        'n%':       相对于屏幕高度的百分比
-                        'top':      显示在屏幕最顶端
-                        'bottom':   显示在屏幕最底端
-                        'centre':   居中显示(默认)
-                        'calc()'    计算
-                    h(水平坐标位置)：number |
-                        'n%':       相对于屏幕宽度的百分比
-                        'left':     显示在屏幕最左端
-                        'right':    显示在屏幕最右端
-                        'centre':   居中显示(默认)
-                        'calc()'    计算
-                    width(宽度)：number |
-                        'n%':       相对于屏幕宽度的百分比
-                        'full':     铺满屏幕
-                        'calc()'    计算
-                    height(高度)：number |
-                        'n%':       相对于屏幕高度的百分比
-                        'full':     铺满屏幕
-                        'calc()'    计算
-                    minWidth(最小宽度)：number |
-                        'n%':       相对于屏幕宽度的百分比
-                        'calc()'    计算
-                    minHeight(最小高度)：number |
-                        'n%':       相对于屏幕高度的百分比
-                        'calc()'    计算
-                    maxWidth(最大宽度)：number |
-                        'n%':       相对于屏幕宽度的百分比
-                        'calc()'    计算
-                    maxHeight(最大高度)：number |
-                        'n%':       相对于屏幕高度的百分比
-                        'calc()'    计算
-                    计算单位：
-                        vw:         屏幕宽度
-                        vh:         屏幕高度
-                        bw:         消息框宽度(仅h v可用)
-                        bh:         消息框高度(仅h v可用)
-                        left：      屏幕最左端(仅h可用)
-                        right：     屏幕最右端(仅h可用)
-                        top：       屏幕最顶端(仅v可用)
-                        bottom：    屏幕最底端(仅v可用)
-            */
-            area: {},
-            //内容是否可以滚动
-            isScroll: false,
-            //是否显示关闭按钮
-            isCloseBtn: true,
-            //是否显示遮罩层
-            isMask: true,
-            //遮罩层颜色
-            maskColor: 'rgba(0,0,0,.6)',
-            //点击遮罩层是否关闭消息框
-            tapMaskClose: true,
-            //父容器
-            parentContainer: document.body,
-            //显示时的过渡动画
-            tranIn: 'popup',
-            //关闭时的过渡动画
-            tranOut: 'popup',
-            //是否关闭其他弹框
-            isCloseOther: false,
-            //关闭后是否自动销毁对象
-            isCloseAfteDestroy: true
-        };
-    })();
-    /*
-        消息框
-    */
-    function Msg(option) {
-        var s = this;
-        option.content = s.evidence;
-        //继承
-        Layer.call(s, option);
-        //生成元素
-        s.elementCache['pl-content'].innerHTML = '<div class="pl-msg"></div>';
-        s.elementCache['pl-msg'] = oftenDomFunc.extend(s.elementCache['pl-content'].querySelector('.pl-msg'));
-        //更新事件
-        s.on('update', function () {
-            s.elementCache['pl-msg'].innerHTML = s.currentConfig.text;
-        });
-        //更新配置
-        s.update(option);
-        //显示
-        s.show();
+    Layer.prototype.defaultConfig = {
+        //模块
+        module: '',
+        //标题
+        title: null,
+        //内容
+        content: null,
+        //背景
+        boxback: '#fff',
+        //圆角
+        borderRadius: '3px',
+        //显示的时间(number:毫秒|false:一直显示)
+        duration: 0,
+        //按钮列表 Array(string|number,...)
+        button: null,
+        //按钮事件列表 Function
+        btnEvent: null,
+        //按钮排列方式 String('h'：横排 | 'v'：竖排)
+        btnAlign: 'h',
+        //指定显示的区域
+        area: {
+            h: '50%',
+            v: '50%'
+        },
+        //是否显示关闭按钮
+        isCloseBtn: true,
+        //是否显示遮罩层
+        isMask: true,
+        //遮罩层颜色
+        maskColor: 'rgba(0,0,0,.6)',
+        //点击遮罩层是否关闭消息框
+        tapMaskClose: true,
+        //父容器
+        parentElement: document.body,
+        //显示和关闭时的过渡动画
+        transition: 'popup',
+        //创建时自动显示
+        isAutoShow: true,
+        //是否关闭其他弹框
+        isCloseOther: false,
+        //关闭后是否自动销毁对象
+        isCloseAfteDestroy: true,
     };
-    oftenFunc.extend(Msg.prototype, Layer.prototype);
-    Msg.prototype.defaultConfig = oftenFunc.clone(Layer.prototype.defaultConfig);
-    oftenFunc.deepExtend(Msg.prototype.defaultConfig, {
+    /*
+     *  消息框
+     */
+    function Msg(option) {
+        var that = this;
+        Layer.call(that, option);
+        that.on('updatebefore', function () {
+            that.currentConfig.content = '<div class="ly-msg">' + that.currentConfig.text + '</div>';
+        });
+        if (that.currentConfig.isAutoShow) {
+            that.show();
+        }
+    };
+    oftenFunc.extend(Msg.prototype, Layer.prototype, true, true);
+    oftenFunc.extend(Msg.prototype.defaultConfig, {
         text: '',
         area: {
             'maxWidth': '60%',
             'maxHeight': '60%'
         },
-        module: 'content',
+        module: 'msg',
         boxback: 'rgba(0,0,0,.7)',
         borderRadius: '4px',
         duration: 2000,
         isMask: false
-    }, true);
+    }, true, true);
     /*
-        遮罩层
-    */
+     *  遮罩层
+     */
     function Mask(option) {
-        var s = this;
-        //继承
-        Layer.call(s, option);
-        //更新配置
-        s.update(option);
-        //显示
-        s.show();
+        var that = this;
+        Layer.call(that, option);
+        if (that.currentConfig.isAutoShow) {
+            that.show();
+        }
     };
-    oftenFunc.extend(Mask.prototype, Layer.prototype);
-    Mask.prototype.defaultConfig = oftenFunc.clone(Layer.prototype.defaultConfig);
+    oftenFunc.extend(Mask.prototype, Layer.prototype, true, true);
     /*
-        tips
-    */
+     *  tips
+     */
     function Tips(option) {
-        var s = this;
-        option.content = s.evidence;
-        //继承
-        Layer.call(s, option);
-        //生成元素
-        s.elementCache['pl-content'].innerHTML = '<div class="pl-tips"></div>';
-        s.elementCache['pl-tips'] = oftenDomFunc.extend(s.elementCache['pl-content'].querySelector('.pl-tips'));
-        //更新配置
-        s.update(option);
-        //显示
-        s.show();
+        var that = this;
+        Layer.call(that, option);
+        that.on('updatebefore', function () {
+            that.currentConfig.title = null;
+            that.currentConfig.button = [];
+            that.currentConfig.content = '<div class="ly-tips" style="border-color:' + that.currentConfig.boxback + '">' + that.currentConfig.text + '</div>';
+            var parentElement = that.getScrollNode();
+            if (that.currentConfig.autoLocate) {
+                oftenDomFunc.on.call(parentElement, 'scroll', function () {
+                    that.updatePosition();
+                });
+                oftenDomFunc.off.call(that.currentConfig.parentElement, 'scroll');
+            }
+            that.currentConfig.parentElement = parentElement;
+            that.elementCache['layer'].css('zIndex', Number(oftenDomFunc.css.call(that.currentConfig.adsorbElement, 'zIndex')) || 1);
+        });
+        that.on('updateing', function (data) {
+            that.updateLocate(data.view, data.rect);
+        });
+        if (that.currentConfig.isAutoShow) {
+            that.show();
+        }
     };
-    oftenFunc.extend(Tips.prototype, Layer.prototype);
-    Tips.prototype.defaultConfig = oftenFunc.clone(Layer.prototype.defaultConfig);
-    //默认配置
-    oftenFunc.deepExtend(Tips.prototype.defaultConfig, {
+    oftenFunc.extend(Tips.prototype, Layer.prototype, true, true);
+    oftenFunc.extend(Tips.prototype.defaultConfig, {
         text: '',
         //显示方向(如果指定方向无法显示完整，则按照top right bottom left顺序依次计算，如果没有一个方向能显示完整，则使用指定方向显示)
         direction: 'top',
         //吸附元素
         adsorbElement: null,
+        //自动设置显示方位
+        autoLocate: false,
         area: {
-            'maxWidth': 220
+            'minWidth': 0,
+            'maxWidth': 220,
         },
         module: 'tips',
         boxback: 'rgba(0,0,0,.7)',
         borderRadius: '3px',
-        duration: 2000,
+        duration: 0,
         isMask: false
-    }, true);
-    //更新当前配置
-    Tips.prototype.updateConfig = function () {
-        var s = this;
-        var config = s.currentConfig;
-
-        s.elementCache['pl-title-bar'].addClass('pl-hide');
-        s.elementCache['pl-btn-list'].addClass('pl-hide');
-
-        if (config.adsorbElement.nodeType === 1) {
-            config.parentContainer = config.adsorbElement.parentNode;
+    }, true, true);
+    //更新
+    Tips.prototype.update = function (option) {
+        var that = this;
+        if (option) {
+            oftenFunc.extend(that.currentConfig, option, true, true);
         }
-        if (config.text === null) {
-            s.elementCache['pl-mian-wrapper'].addClass('pl-hide');
-        } else if (config.text !== s.elementCache['content-node']) {
-            if (config.text.nodeType === 1) {
-                s.elementCache['content-node'] = config.text;
-                s.elementCache['content-parent-node'] = config.text.parentNode;
-                s.elementCache['content-next-sbiling-node'] = oftenDomFunc.getNextSbiling.call(config.text);
-                s.elementCache['pl-tips'].appendChild(config.text);
-            } else {
-                s.elementCache['pl-tips'].innerHTML = config.text;
-            }
-            s.elementCache['pl-mian-wrapper'].removeClass('pl-hide');
-        }
-        if (config.boxback) {
-            s.elementCache['pl-mian-wrapper'].css({
-                'background': config.boxback
+        that.emit('updatebefore');
+        that.updateConfig();
+        var parentElement = that.currentConfig.parentElement === window ? document.body : that.currentConfig.parentElement;
+        if (that.elementCache['layer'].parentNode !== parentElement) {
+            var existingnode = parentElement.firstChild;
+            Array.prototype.slice.call(parentElement.children).every(function (item) {
+                if (!oftenDomFunc.hasClass.call(item, 'layxs-layer-wrap')) {
+                    return existingnode = item, false;
+                }
+                return true;
             });
-            s.elementCache['pl-tips'].css({
-                'border-color': config.boxback
-            });
-        } else {
-            s.elementCache['pl-mian-wrapper'].css({
-                'background': '#fff'
-            });
-            s.elementCache['pl-tips'].css({
-                'border-color': '#fff'
-            });
+            parentElement.insertBefore(that.elementCache['layer'], existingnode);
         }
-        if (config.isMask) {
-            s.elementCache['pl-mask-layer'].style.backgroundColor = config.maskColor;
-            s.elementCache['pl-mask-layer'].removeClass('pl-hide');
-        } else {
-            s.elementCache['pl-mask-layer'].addClass('pl-hide');
-        }
-        s.elementCache['pl-mian-wrapper'].css('border-radius', config.borderRadius);
-        s.elementCache['popup-layer-wrapper'].attr({
-            'data-mode': config.module,
-            'data-tran': config.tranIn
-        });
-        if (config.duration) {
-            clearTimeout(s.timerlist['duration']);
-            s.timerlist['duration'] = setTimeout(function () {
-                s.close();
-            }, config.duration);
-        }
-        return s;
+        that.updatePosition();
+        return that;
     };
-    //更新显示位置
-    Tips.prototype.updatePosition = function () {
-        var s = this;
-        var config = s.currentConfig;
-        var arearect = {};
-        var calc_reg = 'calc\\((\\S+)\\)';
-        var percent_reg = '(([+-]?)\\d+)%$';
-        var number_reg = '^(([+-]?)\\d*\\.?\\d+)$';
-        var fixedHeight = s.elementCache['pl-title-bar'].clientHeight + s.elementCache['pl-btn-list'].clientHeight;
-
-
-        s.elementCache['pl-mian-wrapper'].css({ top: '', left: '', width: '', height: '' });
-        s.elementCache['pl-content'].css({ top: '', left: '', width: '', height: '' });
-
-        //最小宽度
-        if (new RegExp(number_reg).test(config.area.minWidth)) {
-            arearect.minWidth = Number(RegExp.$1);
-        } else if (new RegExp(calc_reg, 'ig').test(config.area.minWidth)) {
-            arearect.minWidth = equation.calc(RegExp.$1) || s.elementCache['pl-content'].clientWidth;
-        } else if (new RegExp(percent_reg).test(config.area.minWidth)) {
-            arearect.minWidth = window.innerWidth * (Number(RegExp.$1) / 100);
-        } else {
-            arearect.minWidth = -Infinity;
-        }
-        //最小高度
-        if (new RegExp(number_reg).test(config.area.minHeight)) {
-            arearect.minHeight = Number(RegExp.$1);
-        } else if (new RegExp(calc_reg, 'ig').test(config.area.minHeight)) {
-            arearect.minHeight = equation.calc(RegExp.$1) - fixedHeight || s.elementCache['pl-content'].clientHeight;
-        } else if (new RegExp(percent_reg).test(config.area.minHeight)) {
-            arearect.minHeight = window.innerWidth * (Number(RegExp.$1) / 100) - fixedHeight;
-        } else {
-            arearect.minHeight = -Infinity;
-        }
-        //最大宽度
-        if (new RegExp(number_reg).test(config.area.maxWidth)) {
-            arearect.maxWidth = Number(RegExp.$1);
-        } else if (new RegExp(calc_reg, 'ig').test(config.area.maxWidth)) {
-            arearect.maxWidth = equation.calc(RegExp.$1) || window.innerWidth;
-        } else if (new RegExp(percent_reg).test(config.area.maxWidth)) {
-            arearect.maxWidth = window.innerWidth * (Number(RegExp.$1) / 100);
-        } else {
-            arearect.maxWidth = window.innerWidth;
-        }
-        //最大高度
-        if (new RegExp(number_reg).test(config.area.maxHeight)) {
-            arearect.maxHeight = Number(RegExp.$1);
-        } else if (new RegExp(calc_reg, 'ig').test(config.area.maxHeight)) {
-            arearect.maxHeight = equation.calc(RegExp.$1) - fixedHeight || window.innerHeight;
-        } else if (new RegExp(percent_reg).test(config.area.maxHeight)) {
-            arearect.maxHeight = window.innerHeight * (Number(RegExp.$1) / 100) - fixedHeight;
-        } else {
-            arearect.maxHeight = window.innerHeight;
-        }
-        if (arearect.minWidth > arearect.maxWidth) {
-            arearect.minWidth = arearect.maxWidth;
-        }
-        if (arearect.minHeight > arearect.maxHeight) {
-            arearect.minHeight = arearect.maxHeight;
-        }
-        //宽度
-        switch (config.area.width) {
-            case 'full':
-                arearect.width = window.innerWidth;
-                break;
-            default:
-                if (new RegExp(number_reg).test(config.area.width)) {
-                    arearect.width = Number(RegExp.$1);
-                } else if (new RegExp(calc_reg, 'ig').test(config.area.width)) {
-                    arearect.width = equation.calc(RegExp.$1);
-                } else if (new RegExp(percent_reg).test(config.area.width)) {
-                    arearect.width = window.innerWidth * (Number(RegExp.$1) / 100);
-                }
-                break;
-        }
-        if (!arearect.width) {
-            arearect.width = s.elementCache['pl-content'].clientWidth;
-            arearect.isAutoWidth = true;
-        }
-        if (arearect.isAutoWidth) {
-            if (arearect.width < arearect.minWidth || arearect.width > arearect.maxWidth) {
-                arearect.width = Math.max(Math.min(arearect.width, arearect.maxWidth), arearect.minWidth);
-                s.elementCache['pl-mian-wrapper'].css('width', arearect.width + 'px');
-            }
-        } else {
-            arearect.width = Math.max(Math.min(arearect.width, arearect.maxWidth), arearect.minWidth);
-            s.elementCache['pl-mian-wrapper'].css('width', arearect.width + 'px');
-        }
-        //高度
-        switch (config.area.height) {
-            case 'full':
-                arearect.height = window.innerHeight;
-                break;
-            default:
-                if (new RegExp(number_reg).test(config.area.height)) {
-                    arearect.height = Number(RegExp.$1);
-                } else if (new RegExp(calc_reg, 'ig').test(config.area.height)) {
-                    arearect.height = equation.calc(RegExp.$1) - fixedHeight;
-                } else if (new RegExp(percent_reg).test(config.area.height)) {
-                    arearect.height = window.innerHeight * (Number(RegExp.$1) / 100) - fixedHeight;
-                }
-                break;
-        }
-        if (!arearect.height) {
-            arearect.height = s.elementCache['pl-content'].clientHeight;
-            arearect.isAutoHeight = true;
-        }
-        if (arearect.isAutoHeight) {
-            if (arearect.height < arearect.minHeight || arearect.height > arearect.maxHeight) {
-                arearect.height = Math.max(Math.min(arearect.height, arearect.maxHeight), arearect.minHeight);
-                s.elementCache['pl-content'].css('height', arearect.height + 'px');
-            }
-        } else {
-            arearect.height = Math.max(Math.min(arearect.height, arearect.maxHeight), arearect.minHeight);
-            s.elementCache['pl-content'].css('height', arearect.height + 'px');
-        }
-        //定位
+    //更新显示方位
+    Tips.prototype.updateLocate = function (replicaView, viewRect) {
+        var that = this;
         var corner = 10;
-        var direction;
-        var offsetTop = s.currentConfig.adsorbElement.offsetTop;
-        var offsetLeft = s.currentConfig.adsorbElement.offsetLeft;
-        var adsorbElementRect = s.currentConfig.adsorbElement.getBoundingClientRect();
-        var checklist = ['top-0', 'top-1', 'top-2', 'right-0', 'right-1', 'right-2', 'bottom-0', 'bottom-1', 'bottom-2', 'left-0', 'left-1', 'left-2'];
-        var checkfull = function (direc) {
+        var locate = '';
+        var parentElement = that.currentConfig.parentElement === window ? document.body : that.currentConfig.parentElement;
+        var offset = oftenDomFunc.getToOffset.call(that.currentConfig.adsorbElement, parentElement);
+        offset.width = that.currentConfig.adsorbElement.clientWidth;
+        offset.height = that.currentConfig.adsorbElement.clientHeight;
+        var keyList = ['t0', 't1', 't2', 'r0', 'r1', 'r2', 'b0', 'b1', 'b2', 'l0', 'l1', 'l2'];
+        var isFull = function (direc) {
             switch (direc) {
-                case 'top-0':
-                    arearect.top = offsetTop - arearect.height - corner;
-                    arearect.left = offsetLeft;
+                case 't0':
+                    viewRect.top = offset.top - viewRect.height - corner;
+                    viewRect.left = offset.left;
                     break;
-                case 'top-1':
-                    arearect.top = offsetTop - arearect.height - corner;
-                    arearect.left = offsetLeft - (arearect.width - adsorbElementRect.width) / 2;
+                case 't1':
+                    viewRect.top = offset.top - viewRect.height - corner;
+                    viewRect.left = offset.left - (viewRect.width - offset.width) / 2;
                     break;
-                case 'top-2':
-                    arearect.top = offsetTop - arearect.height - corner;
-                    arearect.left = offsetLeft + adsorbElementRect.width;
+                case 't2':
+                    viewRect.top = offset.top - viewRect.height - corner;
+                    viewRect.left = offset.left - viewRect.width + offset.width;
                     break;
-                case 'right-0':
-                    arearect.top = offsetTop;
-                    arearect.left = offsetLeft + adsorbElementRect.width + corner;
+                case 'r0':
+                    viewRect.top = offset.top;
+                    viewRect.left = offset.left + offset.width + corner;
                     break;
-                case 'right-1':
-                    arearect.top = offsetTop - (arearect.height - adsorbElementRect.height) / 2;
-                    arearect.left = offsetLeft + adsorbElementRect.width + corner;
+                case 'r1':
+                    viewRect.top = offset.top - (viewRect.height - offset.height) / 2;
+                    viewRect.left = offset.left + offset.width + corner;
                     break;
-                case 'right-2':
-                    arearect.top = offsetTop + adsorbElementRect.height;
-                    arearect.left = offsetLeft + adsorbElementRect.width + corner;
+                case 'r2':
+                    viewRect.top = offset.top - viewRect.height + offset.height;
+                    viewRect.left = offset.left + offset.width + corner;
                     break;
-                case 'bottom-0':
-                    arearect.top = offsetTop + adsorbElementRect.height + corner;
-                    arearect.left = offsetLeft;
+                case 'b0':
+                    viewRect.top = offset.top + offset.height + corner;
+                    viewRect.left = offset.left;
                     break;
-                case 'bottom-1':
-                    arearect.top = offsetTop + adsorbElementRect.height + corner;
-                    arearect.left = offsetLeft - (arearect.width - adsorbElementRect.width) / 2;
+                case 'b1':
+                    viewRect.top = offset.top + offset.height + corner;
+                    viewRect.left = offset.left - (viewRect.width - offset.width) / 2;
                     break;
-                case 'bottom-2':
-                    arearect.top = offsetTop + adsorbElementRect.height + corner;
-                    arearect.left = offsetLeft + adsorbElementRect.width;
+                case 'b2':
+                    viewRect.top = offset.top + offset.height + corner;
+                    viewRect.left = offset.left - viewRect.width + offset.width;
                     break;
-                case 'left-0':
-                    arearect.top = offsetTop;
-                    arearect.left = offsetLeft - arearect.width - corner;
+                case 'l0':
+                    viewRect.top = offset.top;
+                    viewRect.left = offset.left - viewRect.width - corner;
                     break;
-                case 'left-1':
-                    arearect.top = offsetTop - (arearect.height - adsorbElementRect.height) / 2;
-                    arearect.left = offsetLeft - arearect.width - corner;
+                case 'l1':
+                    viewRect.top = offset.top - (viewRect.height - offset.height) / 2;
+                    viewRect.left = offset.left - viewRect.width - corner;
                     break;
-                case 'left-2':
-                    arearect.top = offsetTop + adsorbElementRect.height;
-                    arearect.left = offsetLeft - arearect.width - corner;
+                case 'l2':
+                    viewRect.top = offset.top - viewRect.height + offset.height;
+                    viewRect.left = offset.left - viewRect.width - corner;
                     break;
             }
-            s.elementCache['pl-mian-wrapper'].css({
-                top: arearect.top + 'px',
-                left: arearect.left + 'px'
+            oftenDomFunc.css.call(replicaView, {
+                top: viewRect.top + 'px',
+                left: viewRect.left + 'px',
             });
-            var rectbox = s.elementCache['pl-mian-wrapper'].getBoundingClientRect();
-            if (rectbox.top >= 0 && rectbox.right >= 0 && rectbox.bottom >= 0 && rectbox.left >= 0) {
+            var rect1 = replicaView.getBoundingClientRect();
+            var rect2 = parentElement.getBoundingClientRect();
+            if (that.currentConfig.parentElement === window) {
+                var rect3 = {};
+                for (var name in rect2) {
+                    rect3[name] = rect2[name];
+                }
+                rect2 = rect3;
+                rect2.left = Math.max(rect2.left, 0);
+                rect2.top = Math.max(rect2.top, 0);
+                rect2.width = Math.min(rect2.width, window.innerWidth);
+                rect2.height = Math.min(rect2.height, window.innerHeight);
+            }
+            if (rect1.left > rect2.left &&
+                rect1.top > rect2.top &&
+                rect1.right < rect2.width + rect2.left &&
+                rect1.bottom < rect2.height + rect2.top) {
                 return true;
             }
             return false;
         };
-
-        checklist.splice(0, 0, checklist.splice(checklist.indexOf(config.direction + '-0'), 1)[0]);
-        checklist.splice(1, 0, checklist.splice(checklist.indexOf(config.direction + '-1'), 1)[0]);
-        checklist.splice(2, 0, checklist.splice(checklist.indexOf(config.direction + '-2'), 1)[0]);
-
-        checklist.every(function (name) {
-            if (checkfull(name)) {
-                return direction = name, false;
+        if (that.currentConfig.autoLocate) {
+            keyList.splice(0, 0, keyList.splice(keyList.indexOf(that.currentConfig.direction + '0'), 1)[0]);
+            keyList.splice(1, 0, keyList.splice(keyList.indexOf(that.currentConfig.direction + '1'), 1)[0]);
+            keyList.splice(2, 0, keyList.splice(keyList.indexOf(that.currentConfig.direction + '2'), 1)[0]);
+            keyList.every(function (name) {
+                if (isFull(name)) {
+                    return locate = name, false;
+                }
+                return true;
+            });
+            if (locate === '') {
+                locate = 't0';
+                isFull(locate);
+            }
+        } else {
+            locate = that.currentConfig.direction + '0';
+            isFull(locate);
+        }
+        that.elementCache['layer'].attr('data-locate', locate);
+    };
+    //获取吸附元素向上冒泡路径第一个可以滚动的父元素
+    Tips.prototype.getScrollNode = function () {
+        var that = this;
+        var node = window;
+        oftenDomFunc.getParents.call(that.currentConfig.adsorbElement).every(function (item) {
+            if (/auto|scroll/.test(oftenDomFunc.css.call(item, 'overflow')) ||
+                /fixed/.test(oftenDomFunc.css.call(item, 'position'))) {
+                return node = item, false;
             }
             return true;
         });
-        if (!direction) {
-            direction = config.direction + '-1';
-        }
-        s.elementCache['pl-tips'].attr({
-            'data-direc': direction
-        });
-        return s;
+        return node;
     };
     /*
-        弹出框
-    */
+     *  弹出框
+     */
     function Open(option) {
-        var s = this;
-        //继承
-        Layer.call(s, option);
-        //更新配置
-        s.update(option);
-        //显示
-        s.show();
+        var that = this;
+        Layer.call(that, option);
+        if (that.currentConfig.isAutoShow) {
+            that.show();
+        }
     };
-    oftenFunc.extend(Open.prototype, Layer.prototype);
-    Open.prototype.defaultConfig = oftenFunc.clone(Layer.prototype.defaultConfig);
-    //默认配置
-    oftenFunc.deepExtend(Open.prototype.defaultConfig, {
+    oftenFunc.extend(Open.prototype, Layer.prototype, true, true);
+    oftenFunc.extend(Open.prototype.defaultConfig, {
         area: {
             'maxWidth': '80%',
             'maxHeight': '80%'
         },
-        module: 'content',
+        module: 'open',
         isScroll: true,
         tapMaskClose: false
-    }, true);
+    }, true, true);
     /*
-        提示框
+     *  提示框
     */
     function Alert(option) {
-        var s = this;
-        option.content = s.evidence;
-        //继承
-        Layer.call(s, option);
-        //生成元素
-        s.elementCache['pl-content'].innerHTML = '<div class="pl-alert"></div>';
-        s.elementCache['pl-alert'] = oftenDomFunc.extend(s.elementCache['pl-content'].querySelector('.pl-alert'));
-        //更新事件
-        s.on('update', function () {
-            s.elementCache['pl-alert'].innerHTML = s.currentConfig.text;
+        var that = this;
+        Layer.call(that, option);
+        that.on('updatebefore', function () {
+            that.currentConfig.content = '<div class="ly-alert">' + that.currentConfig.text + '</div>';
         });
-        //更新配置
-        s.update(option);
-        //显示
-        s.show();
+        if (that.currentConfig.isAutoShow) {
+            that.show();
+        }
     };
-    oftenFunc.extend(Alert.prototype, Layer.prototype);
-    Alert.prototype.defaultConfig = oftenFunc.clone(Layer.prototype.defaultConfig);
-    //默认配置
-    oftenFunc.deepExtend(Alert.prototype.defaultConfig, {
+    oftenFunc.extend(Alert.prototype, Layer.prototype, true, true);
+    oftenFunc.extend(Alert.prototype.defaultConfig, {
         text: '',
         area: {
-            'v': '30%',
+            'v': '40%',
             'minWidth': '200',
             'maxWidth': '60%',
-            'maxHeight': '60%'
+            'maxHeight': '60%',
         },
-        module: 'content',
+        module: 'alert',
         button: ['确定'],
-        btnEvent: [function () {
+        btnEvent: function () {
             this.close();
-        }],
+        },
+        borderRadius: '8px',
         isCloseOther: false,
         isCloseAfteDestroy: true
-    }, true);
+    }, true, true);
     /*
-        输入框
-    */
+     *  输入框
+     */
     function Prompt(option) {
-        var s = this;
-        option.content = s.evidence;
-        //继承
-        Layer.call(s, option);
-        //生成元素
-        s.elementCache['pl-content'].innerHTML = ' \
-            <div class="pl-prompt">\
-                <div class="pl-text"></div>\
-                <div class="pl-input"><input value=""></div>\
-            </div>\
-        ';
-        s.elementCache['pl-text'] = oftenDomFunc.extend(s.elementCache['pl-content'].querySelector('.pl-text'));
-        s.elementCache['pl-input'] = oftenDomFunc.extend(s.elementCache['pl-content'].querySelector('.pl-input input'));
-        //更新事件
-        s.on('update', function () {
-            s.elementCache['pl-text'].innerHTML = s.currentConfig.text;
-            s.elementCache['pl-input'].attr({
-                'type': s.currentConfig.inputType,
-                'placeholder': s.currentConfig.placeholder
-            });
+        var that = this;
+        Layer.call(that, option);
+        that.on('updatebefore', function () {
+            that.currentConfig.content = '<div class="ly-prompt">\
+                                                <div class="ly-text">' + that.currentConfig.text + '</div>\
+                                                <input class="ly-input" type="' + that.currentConfig.inputType + '" placeholder="' + that.currentConfig.placeholder + '">\
+                                          </div>';
         });
-        //更新配置
-        s.update(option);
-        //显示
-        s.show();
+        if (that.currentConfig.isAutoShow) {
+            that.show();
+        }
     };
-    oftenFunc.extend(Prompt.prototype, Layer.prototype);
-    Prompt.prototype.defaultConfig = oftenFunc.clone(Layer.prototype.defaultConfig);
-    //默认配置
-    oftenFunc.deepExtend(Prompt.prototype.defaultConfig, {
+    oftenFunc.extend(Prompt.prototype, Layer.prototype, true, true);
+    oftenFunc.extend(Prompt.prototype.defaultConfig, {
         text: '',
         placeholder: '',
         area: {
-            'v': '30%',
+            'v': '40%',
             'minWidth': '200',
             'maxWidth': '80%',
             'maxHeight': '80%'
         },
-        module: 'content',
+        module: 'prompt',
         //回调函数
         callback: null,
         //自定义验证函数
@@ -1503,112 +1594,101 @@
         isCloseBtn: true,
         tapMaskClose: false,
         button: ['取消', '确定'],
-        btnEvent: [function () {
-            this.close();
-        }, function () {
-            this.confirm();
-        }]
-    }, true);
+        btnEvent: function (idx) {
+            switch (idx) {
+                case 0:
+                    this.close();
+                    break;
+                case 1:
+                    this.confirm();
+                    break;
+            }
+        }
+    }, true, true);
     //确认输入回调处理
     Prompt.prototype.confirm = function () {
-        var s = this;
-        if (oftenFunc.isType(s.currentConfig.callback) === 'function') {
-            var val = s.elementCache['pl-input'].value;
-            if (oftenFunc.isType(s.currentConfig.verify) === 'function') {
-                var result = s.currentConfig.verify(val);
+        var that = this;
+        var input = that.elementCache['body'].querySelector('.ly-input')
+        if (oftenFunc.isType(that.currentConfig.callback) === 'function') {
+            var val = input.value;
+            if (oftenFunc.isType(that.currentConfig.verify) === 'function') {
+                var result = that.currentConfig.verify(val);
                 if (result === true) {
-                    s.currentConfig.callback.call(s, val);
+                    that.currentConfig.callback.call(that, val);
                 } else {
-                    layxs.tips(result, s.elementCache['pl-input']);
+                    layxs.tips({
+                        text: result,
+                        direction: 't',
+                        adsorbElement: input,
+                        autoLocate: false,
+                    });
                 }
             } else {
-                s.currentConfig.callback.call(s, val);
+                that.currentConfig.callback.call(that, val);
             }
         }
     };
     /*
-        询问框
-    */
+     *  询问框
+     */
     function Confirm(option) {
-        var s = this;
-        option.content = s.evidence;
-        //继承
-        Layer.call(s, option);
-        //生成元素
-        s.elementCache['pl-content'].innerHTML = '<div class="pl-confirm"></div>';
-        s.elementCache['pl-confirm'] = oftenDomFunc.extend(s.elementCache['pl-content'].querySelector('.pl-confirm'));
-        //更新事件
-        s.on('update', function () {
-            s.elementCache['pl-confirm'].innerHTML = s.currentConfig.text;
+        var that = this;
+        Layer.call(that, option);
+        that.on('updatebefore', function () {
+            that.currentConfig.content = '<div class="ly-confirm">' + that.currentConfig.text + '</div>';
         });
-        //更新配置
-        s.update(option);
-        //显示
-        s.show();
+        if (that.currentConfig.isAutoShow) {
+            that.show();
+        }
     };
-    oftenFunc.extend(Confirm.prototype, Layer.prototype);
-    Confirm.prototype.defaultConfig = oftenFunc.clone(Layer.prototype.defaultConfig);
-    //默认配置
-    oftenFunc.deepExtend(Confirm.prototype.defaultConfig, {
+    oftenFunc.extend(Confirm.prototype, Layer.prototype, true, true);
+    oftenFunc.extend(Confirm.prototype.defaultConfig, {
         text: '',
         area: {
-            'v': '30%',
+            'v': '40%',
             'minWidth': '200',
             'maxWidth': '60%',
             'maxHeight': '60%'
         },
-        module: 'content',
+        module: 'confirm',
         button: ['否', '是'],
-        btnEvent: [function () {
+        btnEvent: function () {
             this.close();
-        }, function () {
-            this.close();
-        }],
+        },
         btnAlign: 'h',
+        borderRadius: '8px',
         isCloseBtn: true,
         tapMaskClose: false
-    }, true);
+    }, true, true);
     /*
-        加载提示
-    */
+     *  加载提示
+     */
     function Loading(option) {
-        var s = this;
-        option.content = s.evidence;
-        //继承
-        Layer.call(s, option);
-        //生成元素
-        s.elementCache['pl-content'].innerHTML = ' \
-            <div class="pl-loading">\
-                <div class="pl-icon pl-icon-loading"></div>\
-                <div class="pl-text">加载中...</div>\
-            </div>\
-        ';
-        s.elementCache['pl-text'] = oftenDomFunc.extend(s.elementCache['pl-content'].querySelector('.pl-text'));
-        //更新事件
-        s.on('update', function () {
-            s.elementCache['pl-text'].innerHTML = s.currentConfig.text;
+        var that = this;
+        Layer.call(that, option);
+        that.on('updatebefore', function () {
+            that.currentConfig.content = '<div class="ly-loading">\
+                                                <div class="ly-icon ly-icon-loading"></div>\
+                                                <div class="ly-text">' + that.currentConfig.text + '</div>\
+                                          </div>';
         });
-        //更新配置
-        s.update(option);
-        //显示
-        s.show();
+        if (that.currentConfig.isAutoShow) {
+            that.show();
+        }
     };
-    oftenFunc.extend(Loading.prototype, Layer.prototype);
-    Loading.prototype.defaultConfig = oftenFunc.clone(Layer.prototype.defaultConfig);
-    //默认配置
-    oftenFunc.deepExtend(Loading.prototype.defaultConfig, {
+    oftenFunc.extend(Loading.prototype, Layer.prototype, true, true);
+    oftenFunc.extend(Loading.prototype.defaultConfig, {
         text: '',
         area: {
             'minWidth': '90',
             'maxWidth': '60%'
         },
         module: 'loading',
-        boxback: 'rgba(0,0,0,.6)',
-        maskColor: 'rgba(0,0,0,.2)',
+        boxback: 'rgba(0,0,0,.8)',
+        maskColor: 'transparent',
         borderRadius: '3px',
         tapMaskClose: false
-    }, true);
-
+    }, true, true);
     //入口
     var layxs = {
         //历史
@@ -1616,44 +1696,44 @@
         //模块列表
         module: {},
         //自增id
-        incrementID: 0,
+        indexId: 0,
         //初始化
         init: function () {
-            var s = this;
-            s.module['msg'] = Msg;
-            s.module['mask'] = Mask;
-            s.module['tips'] = Tips;
-            s.module['open'] = Open;
-            s.module['alert'] = Alert;
-            s.module['prompt'] = Prompt;
-            s.module['confirm'] = Confirm;
-            s.module['loading'] = Loading;
+            var that = this;
+            that.module['msg'] = Msg;
+            that.module['mask'] = Mask;
+            that.module['tips'] = Tips;
+            that.module['open'] = Open;
+            that.module['alert'] = Alert;
+            that.module['prompt'] = Prompt;
+            that.module['confirm'] = Confirm;
+            that.module['loading'] = Loading;
             //加入样式文件
             var link = document.createElement('link');
             link.setAttribute('rel', 'stylesheet');
             link.href = document.currentScript.src.replace(/\/[^/]+$/, '/layxs.css');
             document.head.appendChild(link);
-            return s;
+            return that;
         },
         //关闭所有或指定id的弹框
         close: function (id) {
-            var s = this;
+            var that = this;
             if (id === undefined) {
-                s.history.forEach(function (item) {
+                that.history.forEach(function (item) {
                     item.close();
                 });
-                s.history = [];
+                that.history = [];
             } else {
-                var index = oftenFunc.indexOf(s.history, id, 'id');
+                var index = oftenFunc.indexOf(that.history, id, 'id');
                 if (index > -1) {
-                    s.history.splice(index, 1).close();
+                    that.history.splice(index, 1).close();
                 }
             }
         },
         //设置默认配置
         config: function (name, option) {
-            var s = this;
-            var obj = s.module[name];
+            var that = this;
+            var obj = that.module[name];
             if (obj) {
                 Object.keys(option).forEach(function (name) {
                     if (name in obj.prototype.defaultConfig) {
@@ -1661,17 +1741,12 @@
                     }
                 });
             }
-            return s;
-        },
-        //获取自增id
-        getAutoIncrementID: function () {
-            layxs.incrementID += 1;
-            return layxs.incrementID;
+            return that;
         },
     };
     //消息框
     layxs.msg = function () {
-        var s = this;
+        var that = this;
         var config;
         var option = arguments[0];
         switch (oftenFunc.isType(option)) {
@@ -1689,17 +1764,14 @@
         }
         if (config.text !== null) {
             var box = new Msg(config);
-            box.id = s.getAutoIncrementID();
-            if (box.currentConfig.isCloseOther) {
-                s.close();
-            }
-            s.history.push(box);
+            box.id = that.indexId++;
+            that.history.push(box);
             return box;
         }
     };
     //遮罩层
     layxs.mask = function () {
-        var s = this;
+        var that = this;
         var config;
         var option = arguments[0];
         switch (oftenFunc.isType(option)) {
@@ -1713,16 +1785,13 @@
                 break;
         }
         var box = new Mask(config);
-        box.id = s.getAutoIncrementID();
-        if (box.currentConfig.isCloseOther) {
-            s.close();
-        }
-        s.history.push(box);
+        box.id = that.indexId++;
+        that.history.push(box);
         return box;
     };
     //tips
     layxs.tips = function () {
-        var s = this;
+        var that = this;
         var config;
         var option = arguments[0];
         switch (oftenFunc.isType(option)) {
@@ -1746,17 +1815,14 @@
         }
         if (config.text !== null) {
             var box = new Tips(config);
-            box.id = s.getAutoIncrementID();
-            if (box.currentConfig.isCloseOther) {
-                s.close();
-            }
-            s.history.push(box);
+            box.id = that.indexId++;
+            that.history.push(box);
             return box;
         }
     };
     //页面弹出框
     layxs.open = function () {
-        var s = this;
+        var that = this;
         var config;
         var option = arguments[0];
         switch (oftenFunc.isType(option)) {
@@ -1774,17 +1840,14 @@
         }
         if (config.content !== null) {
             var box = new Open(config);
-            box.id = s.getAutoIncrementID();
-            if (box.currentConfig.isCloseOther) {
-                s.close();
-            }
-            s.history.push(box);
+            box.id = that.indexId++;
+            that.history.push(box);
             return box;
         }
     };
     //提示框
     layxs.alert = function () {
-        var s = this;
+        var that = this;
         var config;
         var option = arguments[0];
         switch (oftenFunc.isType(option)) {
@@ -1799,17 +1862,14 @@
         }
         if (config.text !== null) {
             var box = new Alert(config);
-            box.id = s.getAutoIncrementID();
-            if (box.currentConfig.isCloseOther) {
-                s.close();
-            }
-            s.history.push(box);
+            box.id = that.indexId++;
+            that.history.push(box);
             return box;
         }
     };
     //输入框
     layxs.prompt = function () {
-        var s = this;
+        var that = this;
         var config;
         var option = arguments[0];
         switch (oftenFunc.isType(option)) {
@@ -1827,17 +1887,14 @@
         }
         if (config.text !== null) {
             var box = new Prompt(config);
-            box.id = s.getAutoIncrementID();
-            if (box.currentConfig.isCloseOther) {
-                s.close();
-            }
-            s.history.push(box);
+            box.id = that.indexId++;
+            that.history.push(box);
             return box;
         }
     };
     //询问框
     layxs.confirm = function () {
-        var s = this;
+        var that = this;
         var config;
         var option = arguments[0];
         switch (oftenFunc.isType(option)) {
@@ -1861,17 +1918,14 @@
         }
         if (config.text !== null) {
             var box = new Confirm(config);
-            box.id = s.getAutoIncrementID();
-            if (box.currentConfig.isCloseOther) {
-                s.close();
-            }
-            s.history.push(box);
+            box.id = that.indexId++;
+            that.history.push(box);
             return box;
         }
     };
     //加载提示
     layxs.loading = function () {
-        var s = this;
+        var that = this;
         var config;
         var option = arguments[0];
         switch (oftenFunc.isType(option)) {
@@ -1884,15 +1938,10 @@
                 };
                 break;
         }
-        if (config.text !== null) {
-            var box = new Loading(config);
-            box.id = s.getAutoIncrementID();
-            if (box.currentConfig.isCloseOther) {
-                s.close();
-            }
-            s.history.push(box);
-            return box;
-        }
+        var box = new Loading(config);
+        box.id = that.indexId++;
+        that.history.push(box);
+        return box;
     };
     //暴露入口
     window.layxs = layxs.init();
