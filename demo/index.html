@@ -41,21 +41,6 @@
 	<div style="height:300px"></div>
 	<script src="../src/layxs.js"></script>
 	<script>
-		var laybox = layxs.confirm({
-			text: '请问你觉得 layxs 好用吗？',
-			button: ['<font color="#999">不好用</font>', '好用'],
-			btnEvent: function (index) {
-				switch (index) {
-					case 0:
-						break;
-					case 1:
-						break;
-				}
-				this.close();
-			},
-			isAutoShow: false,
-			isCloseAfteDestroy:false,
-		});
 		document.querySelector('.btnlist').addEventListener('click', function (e) {
 			switch (e.target.getAttribute('data-type')) {
 				case 'msg':
@@ -65,10 +50,32 @@
 					layxs.alert('你好，欢迎使用 layxs欢迎使用 layxs欢迎使用 layxs欢迎使用 layxs欢迎使用 layxs ');
 					break;
 				case 'confirm':
-					layxs.confirm('我倒，你也在网上冲浪啊，你是MM吗？');
+					layxs.confirm('我倒，你也在网上冲浪啊，你是MM吗？', function (idx) {
+						switch (idx) {
+							case 0:
+								layxs.msg('你点击了否');
+								break;
+							case 1:
+								layxs.msg('你点击了是');
+								break;
+						}
+						this.close();
+					});
 					break;
 				case 'confirm-h':
-					laybox.show();
+					layxs.confirm({
+						text: '请问你觉得 layxs 好用吗？',
+						button: ['<font color="#999">不好用</font>', '好用'],
+						btnEvent: function (index) {
+							switch (index) {
+								case 0:
+									break;
+								case 1:
+									break;
+							}
+							this.close();
+						},
+					});
 					break;
 				case 'confirm-v':
 					layxs.confirm({
@@ -125,6 +132,7 @@
 							this.close();
 							layxs.msg('你的邮箱地址：' + name);
 						},
+						inputType:'password',
 					});
 					break;
 				case 'mask':
@@ -163,7 +171,7 @@
 							text: '加载中 ' + schedule + '%'
 						});
 						if (schedule >= 100) {
-							//loadbox.close();
+							loadbox.close();
 						} else {
 							setTimeout(arguments.callee, Math.round(Math.random() * 500));
 						}

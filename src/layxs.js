@@ -1042,10 +1042,9 @@
             oftenFunc.extend(that.currentConfig, option, true, true);
         }
         that.emit('updatebefore');
-        that.updateConfig(); 
-        var parentElement = that.currentConfig.parentElement === window ? document.body : that.currentConfig.parentElement;
-        if (that.elementCache['layer'].parentNode !== parentElement) {
-            parentElement.appendChild(that.elementCache['layer']);
+        that.updateConfig();
+        if (that.elementCache['layer'].parentNode !== that.currentConfig.parentElement) {
+            that.currentConfig.parentElement.appendChild(that.elementCache['layer']);
         }
         that.updatePosition();
         return that;
@@ -1053,6 +1052,7 @@
     //销毁
     Layer.prototype.destroy = function () {
         var that = this;
+        that.emit('destroy');
         if (that.elementCache['content-parent-node']) {
             if (that.elementCache['content-next-sbiling-node']) {
                 that.elementCache['content-parent-node'].insertBefore(that.elementCache['content-node'], that.elementCache['content-next-sbiling-node']);
@@ -1175,7 +1175,7 @@
                 area.width = parseValue(config.area.width, window.innerWidth) || replicaView.clientWidth;
                 break;
         }
-        //宽度可能回出现浮点数，但是clientWidth只能获取整数，所以这里统一加1
+        //宽度可能会出现浮点数，但是clientWidth只能获取整数，所以这里统一加1
         area.width = Math.max(Math.min(area.width, area.maxWidth), area.minWidth) + 1;
         replicaView.style.width = area.width + 'px';
         //高度
@@ -1340,6 +1340,9 @@
         that.on('updateing', function (data) {
             that.updateLocate(data.view, data.rect);
         });
+        that.on('destroy', function () {
+            oftenDomFunc.off.call(that.currentConfig.parentElement, 'scroll');
+        });
         if (that.currentConfig.isAutoShow) {
             that.show();
         }
@@ -1460,8 +1463,8 @@
                 rect2 = rect3;
                 rect2.left = Math.max(rect2.left, 0);
                 rect2.top = Math.max(rect2.top, 0);
-                rect2.width = Math.min(rect2.width, window.innerWidth);
-                rect2.height = Math.min(rect2.height, window.innerHeight);
+                rect2.width = Math.min(rect2.width, window.innerWidth - oftenDomFunc.css.call(document.body, 'marginLeft')- oftenDomFunc.css.call(document.body, 'marginRight'));
+                rect2.height = Math.min(rect2.height, window.innerHeight - oftenDomFunc.css.call(document.body, 'marginTop') - oftenDomFunc.css.call(document.body, 'marginBottom'));
             }
             if (rect1.left > rect2.left &&
                 rect1.top > rect2.top &&
@@ -1482,7 +1485,7 @@
                 return true;
             });
             if (locate === '') {
-                locate = 't0';
+                locate = that.currentConfig.direction + '0';
                 isFull(locate);
             }
         } else {
@@ -1551,7 +1554,7 @@
         btnEvent: function () {
             this.close();
         },
-        borderRadius: '8px',
+        borderRadius: '3px',
         isCloseOther: false,
         isCloseAfteDestroy: true
     }, true, true);
@@ -1662,7 +1665,7 @@
             this.close();
         },
         btnAlign: 'h',
-        borderRadius: '8px',
+        borderRadius: '3px',
         isCloseBtn: true,
         tapMaskClose: false
     }, true, true);
@@ -1915,14 +1918,8 @@
                 config = {
                     text: option
                 };
-                if (arguments.length > 1) {
-                    config.btnEvent = [];
-                }
                 if (oftenFunc.isType(arguments[1]) === 'function') {
-                    config.btnEvent[0] = arguments[1];
-                }
-                if (oftenFunc.isType(arguments[2]) === 'function') {
-                    config.btnEvent[1] = arguments[2];
+                    config.btnEvent = arguments[1];
                 }
                 break;
         }
