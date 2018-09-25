@@ -5,7 +5,7 @@
     <meta name="format-detection" content="telephone=no" />
     <title>弹出层</title>
     <style>
-        body { max-width: 1120px; margin: 0 auto; font-size: 14px; -webkit-tap-highlight-color: transparent; font-size: 1em;margin:10px; }
+        body { max-width: 1120px; margin: 0 auto; font-size: 14px; -webkit-tap-highlight-color: transparent; font-size: 1em;position:relative;}
         .titlebox { border-style: solid; border-bottom: none; border-left: none; border-right: none; border-color: #e6e6e6; border-width: 1px; padding: 0; margin: 0; margin-top: 20px; }
         .titlebox legend { padding: 0 10px; margin-left: 20px; font-size: 16px; }
         .btnlist { padding: 10px; font-size: 0;height:300px;}
@@ -145,12 +145,12 @@
 					layxs.tips('hello，我在下面', e.target, 'b');
 					break;
 				case 'left-tips':
-					layxs.tips('hello，我在左边我在左边我在左边我在左边', e.target, 'l');
+					layxs.tips('hello，我在左边', e.target, 'l');
 					break;
 				case 'right-tips':
 					//layxs.tips('hello，我在右边', e.target, 'right');
 					layxs.tips({
-						text: 'hello，我在右边我在右边我在右边我在右边',
+						text: 'hello，我在右边',
 						direction: 'r',
 						adsorbElement: e.target,
 						title: '标题'

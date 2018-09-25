@@ -492,32 +492,6 @@
             }
             return null;
         },
-        //获取相对于指定父元素的位置
-        getToOffset: function (el) {
-            var that = this;
-            var offset = {
-                top: that.offsetTop,
-                left: that.offsetLeft,
-            };
-            var path = oftenDomFunc.getParents.call(that);
-            path.length = Math.max(path.indexOf(el) + 1, 0);
-            path.splice(0, 1);
-            path.forEach(function (item) {
-                //相对和绝对定位，会影响offset
-                if (/relative|absolute|fixed/.test(oftenDomFunc.css.call(item, 'position'))) {
-                    offset.top += item.offsetTop;
-                    offset.left += item.offsetLeft;
-                }
-            });
-            offset.top -= el.offsetTop + oftenDomFunc.css.call(el, 'paddingTop');
-            offset.left -= el.offsetLeft + oftenDomFunc.css.call(el, 'paddingLeft');
-            if (el === document.body) {
-                //body的offsetTop和offsetLeft总会是0，所以需要再减去margin
-                offset.top -= oftenDomFunc.css.call(el, 'marginTop');
-                offset.left -= oftenDomFunc.css.call(el, 'marginLeft');
-            }
-            return offset;
-        },
     };
     window.oftenDomFunc = oftenDomFunc = new oftenDomFunc();
     //tap事件处理
@@ -1003,9 +977,8 @@
                 }
             }
         });
-        oftenDomFunc.on.call(window, 'resize', function () {
-            that.updatePosition();
-        });
+        that.updatePosition = that.updatePosition.bind(that);
+        oftenDomFunc.on.call(window, 'resize', that.updatePosition);
         //是否关闭其他弹框
         if (that.currentConfig.isCloseOther) {
             layxs.close();
@@ -1066,7 +1039,7 @@
         that.elementCache['mask'].off('tap');
         that.elementCache['func'].off('tap');
         that.elementCache['close'].off('tap');
-        oftenDomFunc.off.call(window, 'resize');
+        oftenDomFunc.off.call(window, 'resize', that.updatePosition);
         return that;
     };
     //更新当前配置
@@ -1363,7 +1336,7 @@
         module: 'tips',
         boxback: 'rgba(0,0,0,.7)',
         borderRadius: '3px',
-        duration: 2000,
+        duration: 0,
         isMask: false
     }, true, true);
     //更新
@@ -1388,13 +1361,35 @@
         that.updatePosition();
         return that;
     };
+    //获取吸附元素相对于父容器的位置
+    Tips.prototype.getToOffset = function () {
+        var that = this;
+        var adsorbElement = that.currentConfig.adsorbElement;
+        var parentElement = that.currentConfig.parentElement === window ? document.body : that.currentConfig.parentElement;
+        var offset = {
+            top: adsorbElement.offsetTop,
+            left: adsorbElement.offsetLeft,
+        };
+        var path = oftenDomFunc.getParents.call(adsorbElement);
+        path.length = Math.max(path.indexOf(parentElement), 0);
+        path.splice(0, 1);
+        path.forEach(function (item) {
+            //相对和绝对定位，会影响offset
+            if (/relative|absolute|fixed/.test(oftenDomFunc.css.call(item, 'position'))) {
+                offset.top += item.offsetTop;
+                offset.left += item.offsetLeft;
+            }
+        });
+        offset.top -= that.elementCache['layer'].offsetTop;
+        offset.left -= that.elementCache['layer'].offsetLeft;
+        return offset;
+    };
     //更新显示方位
     Tips.prototype.updateLocate = function (replicaView, viewRect) {
         var that = this;
         var corner = 10;
         var locate = '';
-        var parentElement = that.currentConfig.parentElement === window ? document.body : that.currentConfig.parentElement;
-        var offset = oftenDomFunc.getToOffset.call(that.currentConfig.adsorbElement, parentElement);
+        var offset = that.getToOffset();
         offset.width = that.currentConfig.adsorbElement.clientWidth;
         offset.height = that.currentConfig.adsorbElement.clientHeight;
         var keyList = ['t0', 't1', 't2', 'r0', 'r1', 'r2', 'b0', 'b1', 'b2', 'l0', 'l1', 'l2'];
@@ -1454,17 +1449,12 @@
                 left: viewRect.left + 'px',
             });
             var rect1 = replicaView.getBoundingClientRect();
-            var rect2 = parentElement.getBoundingClientRect();
             if (that.currentConfig.parentElement === window) {
-                var rect3 = {};
-                for (var name in rect2) {
-                    rect3[name] = rect2[name];
-                }
-                rect2 = rect3;
-                rect2.left = Math.max(rect2.left, 0);
-                rect2.top = Math.max(rect2.top, 0);
-                rect2.width = Math.min(rect2.width, window.innerWidth - oftenDomFunc.css.call(document.body, 'marginLeft')- oftenDomFunc.css.call(document.body, 'marginRight'));
-                rect2.height = Math.min(rect2.height, window.innerHeight - oftenDomFunc.css.call(document.body, 'marginTop') - oftenDomFunc.css.call(document.body, 'marginBottom'));
+                var rect2 = that.elementCache['layer'].getBoundingClientRect();
+                rect2.width = window.innerWidth - rect2.left;
+                rect2.height = window.innerHeight - rect2.top;
+            } else {
+                var rect2 = that.currentConfig.parentElement.getBoundingClientRect();
             }
             if (rect1.left > rect2.left &&
                 rect1.top > rect2.top &&
