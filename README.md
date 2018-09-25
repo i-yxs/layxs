@@ -37,14 +37,12 @@
     duration: 0,
     //按钮列表 Array(string|number,...)
     button: null,
-    //按钮事件列表 Array(function,...)
+    //按钮事件回调 function
     btnEvent: null,
     //按钮排列方式 String('h'：横排 | 'v'：竖排)
     btnAlign: 'h',
     //显示区域（详见附录2）
     area: {},
-    //内容是否可以滚动
-    isScroll: false,
     //是否显示关闭按钮
     isCloseBtn: true,
     //是否显示遮罩层
@@ -55,10 +53,8 @@
     tapMaskClose: true,
     //父容器
     parentContainer: document.body,
-    //显示时的过渡动画（详见附录4）
-    tranIn: 'popup',
-    //关闭时的过渡动画（详见附录4）
-    tranOut: 'popup',
+    //显示和关闭时的过渡动画
+    transition: 'popup',
     //是否关闭其他弹框
     isCloseOther: false,
     //关闭后是否自动销毁对象
@@ -117,9 +113,11 @@ layxs.tips('hello，我是Tips', 'DOM元素', 'top', 2000);
     //文本
     text: '',
     //显示方位（详见附录5）
-    direction:'top',
+    direction:'t',
     //吸附元素
-    adsorbElement:'DOM元素'
+    adsorbElement:'DOM元素',
+    //是否自动设置显示方位
+    autoLocate: true,
 }
 ```
 
@@ -202,17 +200,29 @@ layxs.prompt('请输入您的邮箱地址', function (val) {
 layxs.alert({
     text:'请问你觉得 layxs 好用吗？',
     button: ['<font color="#999">不好用</font>', '好用'],
-    btnEvent: function () {
-        this.close();
-    }, function () {
+    btnEvent: function (idx) {
+        switch (index) {
+            case 0:
+                //点击了第一个按钮
+                break;
+            case 1:
+                //点击了第二个按钮
+                break;
+        }
         this.close();
     }
 });
 
-//简易写法 参数：(文本,选择"否"时的回调函数,选择"是"时的回调函数)
-layxs.confirm('请问你觉得 layxs 好用吗？',function () {
-    this.close();
-}, function () {
+//简易写法 参数：(文本,按钮点击事件回调，传入当前点击按钮的下标)
+layxs.confirm('我倒，你也在网上冲浪啊，你是MM吗？', function (idx) {
+    switch (idx) {
+        case 0:
+            layxs.msg('你点击了否');
+            break;
+        case 1:
+            layxs.msg('你点击了是');
+            break;
+    }
     this.close();
 });
 ```
@@ -375,8 +385,7 @@ layxs.msg({
 ```javascript
 //例子
 layxs.msg({
-    tranIn:'popup',
-    tranOut:'popup',
+    transition:'popup',
 });
 
 //动画效果列表
@@ -390,5 +399,5 @@ layxs.msg({
 ```
 
 * #### 附录5
-> `direction` 用于设置Tips弹出层的显示方位 <br>
-> 如果指定方向无法显示完整，则按照top right bottom left顺序依次计算，如果没有一个方向能显示完整，则使用指定方向显示
+> `direction` 用于设置Tips弹出层的显示方位，可以设置 `t` 元素的上面 `r` 元素的右面 `b` 元素的下面 `l` 元素的左面 四个方位 <br>
+> `autoLocate` 设置为true时，会自动找到一个可以显示完整的方位，如果没有一个方位能显示完整，则按`t0`显示
