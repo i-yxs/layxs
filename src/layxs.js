@@ -1026,23 +1026,11 @@
         clearTimeout(that.timerlist['duration']);
         if (that.elementCache['layer'].attr('data-show') == 1 && that.currentConfig.transition) {
             that.elementCache['layer'].attr('data-show', 0).on('transitionend', function () {
-                that.close()
-            });
-        } else {
-            if (that.currentConfig.isCloseAfteDestroy) {
-                that.destroy();
-            }
-            if (that.elementCache['content-parent-node']) {
-                if (that.elementCache['content-next-sbiling-node']) {
-                    that.elementCache['content-parent-node'].insertBefore(that.elementCache['content-node'], that.elementCache['content-next-sbiling-node']);
-                } else {
-                    that.elementCache['content-parent-node'].appendChild(that.elementCache['content-node']);
+                if (that.currentConfig.isCloseAfteDestroy) {
+                    that.destroy();
                 }
-            }
-            that.elementCache['content-node'] = null;
-            that.elementCache['content-parent-node'] = null;
-            that.elementCache['content-next-sbiling-node'] = null;
-            that.elementCache['layer'].off('transitionend');
+                that.elementCache['layer'].off('transitionend').remove();
+            });
         }
         that.emit('close');
         return that;
@@ -1065,10 +1053,19 @@
     //销毁
     Layer.prototype.destroy = function () {
         var that = this;
+        if (that.elementCache['content-parent-node']) {
+            if (that.elementCache['content-next-sbiling-node']) {
+                that.elementCache['content-parent-node'].insertBefore(that.elementCache['content-node'], that.elementCache['content-next-sbiling-node']);
+            } else {
+                that.elementCache['content-parent-node'].appendChild(that.elementCache['content-node']);
+            }
+        }
+        that.elementCache['content-node'] = null;
+        that.elementCache['content-parent-node'] = null;
+        that.elementCache['content-next-sbiling-node'] = null;
         that.elementCache['mask'].off('tap');
         that.elementCache['func'].off('tap');
         that.elementCache['close'].off('tap');
-        that.elementCache['layer'].remove();
         oftenDomFunc.off.call(window, 'resize');
         return that;
     };
@@ -1355,7 +1352,7 @@
         //吸附元素
         adsorbElement: null,
         //自动设置显示方位
-        autoLocate: false,
+        autoLocate: true,
         area: {
             'minWidth': 0,
             'maxWidth': 220,
@@ -1363,7 +1360,7 @@
         module: 'tips',
         boxback: 'rgba(0,0,0,.7)',
         borderRadius: '3px',
-        duration: 0,
+        duration: 2000,
         isMask: false
     }, true, true);
     //更新
@@ -1564,11 +1561,20 @@
     function Prompt(option) {
         var that = this;
         Layer.call(that, option);
+
+        var content = document.createElement('div');
+        content.className = 'ly-prompt';
+        content.innerHTML = '<div class="ly-text"></div><input class="ly-input">';
+        that.elementCache['text'] = content.querySelector('.ly-text');
+        that.elementCache['input'] = content.querySelector('.ly-input');
+
         that.on('updatebefore', function () {
-            that.currentConfig.content = '<div class="ly-prompt">\
-                                                <div class="ly-text">' + that.currentConfig.text + '</div>\
-                                                <input class="ly-input" type="' + that.currentConfig.inputType + '" placeholder="' + that.currentConfig.placeholder + '">\
-                                          </div>';
+            that.currentConfig.content = content;
+            that.elementCache['text'].innerText = that.currentConfig.text;
+            oftenDomFunc.attr.call(that.elementCache['input'], {
+                type: that.currentConfig.inputType,
+                placeholder: that.currentConfig.placeholder,
+            });
         });
         if (that.currentConfig.isAutoShow) {
             that.show();
@@ -1666,11 +1672,15 @@
     function Loading(option) {
         var that = this;
         Layer.call(that, option);
+
+        var content = document.createElement('div');
+        content.className = 'ly-loading';
+        content.innerHTML = '<div class="ly-icon ly-icon-loading"></div><div class="ly-text"></div>';
+        that.elementCache['text'] = content.querySelector('.ly-text');
+
         that.on('updatebefore', function () {
-            that.currentConfig.content = '<div class="ly-loading">\
-                                                <div class="ly-icon ly-icon-loading"></div>\
-                                                <div class="ly-text">' + that.currentConfig.text + '</div>\
-                                          </div>';
+            that.currentConfig.content = content;
+            that.elementCache['text'].innerText = that.currentConfig.text;
         });
         if (that.currentConfig.isAutoShow) {
             that.show();

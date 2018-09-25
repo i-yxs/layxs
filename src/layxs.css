@@ -50,7 +50,7 @@
 .layxs-layer-wrap[data-locate=b2] .ly-tips:before{top:-12px;right:12px;border-bottom-color:inherit;}
 /*动画*/
 .layxs-layer-wrap{transition:opacity .3s;-webkit-transition:opacity .3s;}
-.layxs-layer-wrap[data-show='0']{opacity:0;}
+.layxs-layer-wrap[data-show='0']{opacity:0;pointer-events:none;}
 .layxs-layer-wrap[data-show='1']{opacity:1;}
 /*弹出*/
 .layxs-layer-wrap[data-transition=popup][data-show='0'] > .ly-view-wrap{transform:scale3d(.5,.5,1);-webkit-transform:scale3d(.5,.5,1);transition:transform .3s cubic-bezier(0, 0, .5, -1);-webkit-transition:-webkit-transform .3s cubic-bezier(0, 0, .5, -1);}

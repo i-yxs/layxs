@@ -41,6 +41,21 @@
 	<div style="height:300px"></div>
 	<script src="../src/layxs.js"></script>
 	<script>
+		var laybox = layxs.confirm({
+			text: '请问你觉得 layxs 好用吗？',
+			button: ['<font color="#999">不好用</font>', '好用'],
+			btnEvent: function (index) {
+				switch (index) {
+					case 0:
+						break;
+					case 1:
+						break;
+				}
+				this.close();
+			},
+			isAutoShow: false,
+			isCloseAfteDestroy:false,
+		});
 		document.querySelector('.btnlist').addEventListener('click', function (e) {
 			switch (e.target.getAttribute('data-type')) {
 				case 'msg':
@@ -53,19 +68,7 @@
 					layxs.confirm('我倒，你也在网上冲浪啊，你是MM吗？');
 					break;
 				case 'confirm-h':
-					layxs.confirm({
-						text: '请问你觉得 layxs 好用吗？',
-						button: ['<font color="#999">不好用</font>', '好用'],
-						btnEvent: function (index) {
-							switch (index) {
-								case 0:
-									break;
-								case 1:
-									break;
-							}
-							this.close();
-						}
-					});
+					laybox.show();
 					break;
 				case 'confirm-v':
 					layxs.confirm({
@@ -160,7 +163,7 @@
 							text: '加载中 ' + schedule + '%'
 						});
 						if (schedule >= 100) {
-							loadbox.close();
+							//loadbox.close();
 						} else {
 							setTimeout(arguments.callee, Math.round(Math.random() * 500));
 						}
