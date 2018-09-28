@@ -381,7 +381,7 @@ layxs.msg({
 ```
 
 * #### 附录4
-> `tranIn` `tranOut` 用于设置弹出层显示和关闭的过渡动画效果 <br>
+> `transition` 用于设置弹出层显示和关闭的过渡动画效果 <br>
 ```javascript
 //例子
 layxs.msg({
