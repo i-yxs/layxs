@@ -8,7 +8,7 @@
         body { max-width: 1120px; margin: 0 auto; font-size: 14px; -webkit-tap-highlight-color: transparent; font-size: 1em;position:relative;}
         .titlebox { border-style: solid; border-bottom: none; border-left: none; border-right: none; border-color: #e6e6e6; border-width: 1px; padding: 0; margin: 0; margin-top: 20px; }
         .titlebox legend { padding: 0 10px; margin-left: 20px; font-size: 16px; }
-        .btnlist { padding: 10px; font-size: 0;height:300px;}
+        .btnlist { padding: 10px; font-size: 0;height:300px;overflow:auto;}
         .btnlist .btn { display: inline-block; margin: 10px 10px 0 0; padding: 5px 15px; line-height: 24px; border: solid 1px #ccc; font-size: 14px; border-radius: 3px; color: #333; text-decoration: none; }
         .btnlist .btn:active { background: rgba(0,0,0,.03); border-color: #1886fe; color: #1886fe; }
     </style>
@@ -132,14 +132,13 @@
 							this.close();
 							layxs.msg('你的邮箱地址：' + name);
 						},
-						inputType:'password',
 					});
 					break;
 				case 'mask':
 					layxs.mask('rgba(255, 0, 0, 0.5)');
 					break;
 				case 'top-tips':
-					layxs.tips('hello，我在上面', e.target, 't');
+					layxs.tips('hello，我在上面', e.target, 't', 0);
 					break;
 				case 'bottom-tips':
 					layxs.tips('hello，我在下面', e.target, 'b');

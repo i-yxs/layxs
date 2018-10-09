@@ -1,7 +1,7 @@
 ﻿/*
     弹出层(移动端)
     作者：yxs
-    项目地址：https://github.com/qq597392321/layxs
+    项目地址：https://github.com/i-yxs/layxs
 */
 (function (window) {
     'use strict';
@@ -1274,7 +1274,7 @@
             'maxHeight': '60%'
         },
         module: 'msg',
-        boxback: 'rgba(0,0,0,.7)',
+        boxback: 'rgba(0,0,0,.8)',
         borderRadius: '4px',
         duration: 2000,
         isMask: false
@@ -1302,10 +1302,8 @@
             that.currentConfig.content = '<div class="ly-tips" style="border-color:' + that.currentConfig.boxback + '">' + that.currentConfig.text + '</div>';
             var parentElement = that.getScrollNode();
             if (that.currentConfig.autoLocate) {
-                oftenDomFunc.on.call(parentElement, 'scroll', function () {
-                    that.updatePosition();
-                });
-                oftenDomFunc.off.call(that.currentConfig.parentElement, 'scroll');
+                oftenDomFunc.on.call(parentElement, 'scroll', that.updatePosition);
+                oftenDomFunc.off.call(that.currentConfig.parentElement, 'scroll', that.updatePosition);
             }
             that.currentConfig.parentElement = parentElement;
             that.elementCache['layer'].css('zIndex', Number(oftenDomFunc.css.call(that.currentConfig.adsorbElement, 'zIndex')) || 1);
@@ -1314,7 +1312,7 @@
             that.updateLocate(data.view, data.rect);
         });
         that.on('destroy', function () {
-            oftenDomFunc.off.call(that.currentConfig.parentElement, 'scroll');
+            oftenDomFunc.off.call(that.currentConfig.parentElement, 'scroll', that.updatePosition);
         });
         if (that.currentConfig.isAutoShow) {
             that.show();
@@ -1334,9 +1332,9 @@
             'maxWidth': 220,
         },
         module: 'tips',
-        boxback: 'rgba(0,0,0,.7)',
+        boxback: 'rgba(0,0,0,.8)',
         borderRadius: '3px',
-        duration: 0,
+        duration: 2000,
         isMask: false
     }, true, true);
     //更新
@@ -1456,7 +1454,11 @@
             } else {
                 var rect2 = that.currentConfig.parentElement.getBoundingClientRect();
             }
-            if (rect1.left > rect2.left &&
+            if (rect1.left > 0 &&
+                rect1.top > 0 &&
+                rect1.left + rect1.width < window.innerWidth &&
+                rect1.top + rect1.height < window.innerHeight &&
+                rect1.left > rect2.left &&
                 rect1.top > rect2.top &&
                 rect1.right < rect2.width + rect2.left &&
                 rect1.bottom < rect2.height + rect2.top) {
