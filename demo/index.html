@@ -30,7 +30,7 @@
 		<a class="btn" data-type="mask" href="javascript:void(0)">遮罩层</a>
 		<a class="btn" data-type="loading" href="javascript:void(0)">加载中</a>
 		<a class="btn" data-type="schedule" href="javascript:void(0)">加载进度</a>
-		<div style="text-align:center;margin-top:20px;position:relative">
+		<div style="text-align:center;margin-top:20px;position:relative;width:120%;">
 			<p><a class="btn" data-type="top-tips" href="javascript:void(0)">上tips</a></p>
 			<p><a class="btn" data-type="right-tips" href="javascript:void(0)">右tips</a></p>
 			<p><a class="btn" data-type="left-tips" href="javascript:void(0)">左tips</a></p>
@@ -47,7 +47,7 @@
 					var msg = layxs.msg('你好，欢迎使用 layxs ');
 					break;
 				case 'alert':
-					layxs.alert('你好，欢迎使用 layxs欢迎使用 layxs欢迎使用 layxs欢迎使用 layxs欢迎使用 layxs ');
+					layxs.alert('你好，欢迎使用 layxs');
 					break;
 				case 'confirm':
 					layxs.confirm('我倒，你也在网上冲浪啊，你是MM吗？', function (idx) {
@@ -138,13 +138,13 @@
 					layxs.mask('rgba(255, 0, 0, 0.5)');
 					break;
 				case 'top-tips':
-					layxs.tips('hello，我在上面', e.target, 't', 0);
+					layxs.tips('hello，我在上面', e.target, 't', 5000);
 					break;
 				case 'bottom-tips':
-					layxs.tips('hello，我在下面', e.target, 'b');
+					layxs.tips('hello，我在下面', e.target, 'b', 5000);
 					break;
 				case 'left-tips':
-					layxs.tips('hello，我在左边', e.target, 'l');
+					layxs.tips('hello，我在左边', e.target, 'l', 5000);
 					break;
 				case 'right-tips':
 					//layxs.tips('hello，我在右边', e.target, 'right');
@@ -153,7 +153,7 @@
 						direction: 'r',
 						adsorbElement: e.target,
 						title: '标题'
-					});
+					}, 5000);
 					break;
 				case 'loading':
 					var loadbox = layxs.loading('加载中...');
@@ -178,17 +178,6 @@
 					break;
 			}
 		});
-
-
-		var $titlebox = document.querySelector('.titlebox');
-
-		oftenDomFunc.bind($titlebox);
-
-
-		$titlebox.on('drag', function (e) {
-			console.log(e);
-		});
-
 	</script>
 </body>
 </html>

@@ -742,13 +742,13 @@
                     liftCache: oftenDomFunc.event.drag.lift.bind(el),
                 };
                 if ('ontouchstart' in document) {
-                    el.addEventListener('touchstart', data.$drag.downCache);
-                    window.addEventListener('touchmove', data.$drag.moveCache);
-                    window.addEventListener('touchend', data.$drag.liftCache);
+                    el.addEventListener('touchstart', data.$drag.downCache, { passive: false });
+                    window.addEventListener('touchmove', data.$drag.moveCache, { passive: false });
+                    window.addEventListener('touchend', data.$drag.liftCache, { passive: false });
                 } else {
-                    el.addEventListener('mousedown', data.$drag.downCache);
-                    window.addEventListener('mousemove', data.$drag.moveCache);
-                    window.addEventListener('mouseup', data.$drag.liftCache);
+                    el.addEventListener('mousedown', data.$drag.downCache, { passive: false });
+                    window.addEventListener('mousemove', data.$drag.moveCache, { passive: false });
+                    window.addEventListener('mouseup', data.$drag.liftCache, { passive: false });
                 }
             }
         },
