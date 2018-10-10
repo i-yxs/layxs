@@ -287,16 +287,22 @@
         //获取当前事件目标的冒泡路径，可使用选择器进行筛选
         that.getEventAgencyTarget = function (selector) {
             var that = this;
-            var list1 = [];
             if (event.srcElement) {
-                var list2 = Array.prototype.slice.call(document.querySelectorAll(selector));
-                that.getParents.call(event.srcElement).forEach(function (item) {
-                    if (list2.indexOf(item) > -1) {
-                        list1.push(item);
-                    }
-                });
+                var list = that.getParents.call(event.srcElement);
+                if (selector) {
+                    var list1 = [];
+                    var list2 = Array.prototype.slice.call(document.querySelectorAll(selector));
+                    list.forEach(function (item) {
+                        if (list2.indexOf(item) > -1) {
+                            list1.push(item);
+                        }
+                    });
+                    return list1;
+                } else {
+                    return list;
+                }
             }
-            return list1;
+            return [];
         };
     };
     oftenDomFunc.prototype = {
@@ -311,7 +317,7 @@
             if (oftenDomFunc.event[name]) {
                 oftenDomFunc.event[name].on(that, name, callback);
             } else {
-                that.addEventListener(name, callback);
+                that.addEventListener.apply(that, arguments);
             }
             return that;
         },
@@ -338,7 +344,7 @@
                         if (oftenDomFunc.event[name]) {
                             oftenDomFunc.event[name].off(that, name, callback);
                         } else {
-                            that.removeEventListener(name, callback);
+                            that.removeEventListener.apply(that, arguments);
                         }
                     }
                 }
@@ -406,12 +412,13 @@
         //获取所有祖先元素，可使用选择器进行筛选
         parents: function (selector) {
             var that = this;
-            var list = that.getParents();
+            var list = oftenDomFunc.getParents.call(that);
+            list.splice(0, 1);
             if (selector) {
                 var list1 = [];
                 var list2 = Array.prototype.slice.call(document.querySelectorAll(selector));
                 list.forEach(function (item) {
-                    if (list2.indexOf(item) > -1 && item !== that) {
+                    if (list2.indexOf(item) > -1) {
                         list1.push(item);
                     }
                 });
@@ -468,8 +475,8 @@
             }
             return path;
         },
-        //获取下一个兄弟节点
-        getNextSbiling: function () {
+        //获取前一个兄弟节点
+        getBeforeSibling: function () {
             var that = this;
             if (that.parentNode) {
                 var list = Array.prototype.slice.call(that.parentNode.children);
@@ -480,8 +487,8 @@
             }
             return null;
         },
-        //获取上一个兄弟节点
-        getPreviousSbiling: function () {
+        //获取后一个兄弟节点
+        getAfterSibling: function () {
             var that = this;
             if (that.parentNode) {
                 var list = Array.prototype.slice.call(that.parentNode.children);
@@ -1063,7 +1070,7 @@
             if (config.content.nodeType === 1) {
                 that.elementCache['content-node'] = config.content;
                 that.elementCache['content-parent-node'] = config.content.parentNode;
-                that.elementCache['content-next-sbiling-node'] = oftenDomFunc.getNextSbiling.call(config.content);
+                that.elementCache['content-next-sbiling-node'] = oftenDomFunc.getBeforeSibling.call(config.content);
                 that.elementCache['body'].appendChild(config.content);
             } else if (typeof config.content === 'object') {
                 that.elementCache['body'].innerHTML = JSON.stringify(config.content);

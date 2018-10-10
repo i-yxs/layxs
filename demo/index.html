@@ -7,7 +7,7 @@
     <style>
         body { max-width: 1120px; margin: 0 auto; font-size: 14px; -webkit-tap-highlight-color: transparent; font-size: 1em;position:relative;}
         .titlebox { border-style: solid; border-bottom: none; border-left: none; border-right: none; border-color: #e6e6e6; border-width: 1px; padding: 0; margin: 0; margin-top: 20px; }
-        .titlebox legend { padding: 0 10px; margin-left: 20px; font-size: 16px; }
+        .titlebox legend{ padding: 0 10px; margin-left: 20px; font-size: 16px; }
         .btnlist { padding: 10px; font-size: 0;height:300px;overflow:auto;}
         .btnlist .btn { display: inline-block; margin: 10px 10px 0 0; padding: 5px 15px; line-height: 24px; border: solid 1px #ccc; font-size: 14px; border-radius: 3px; color: #333; text-decoration: none; }
         .btnlist .btn:active { background: rgba(0,0,0,.03); border-color: #1886fe; color: #1886fe; }
@@ -152,8 +152,9 @@
 						text: 'hello，我在右边',
 						direction: 'r',
 						adsorbElement: e.target,
-						title: '标题'
-					}, 5000);
+						title: '标题',
+						duration:5000,
+					});
 					break;
 				case 'loading':
 					var loadbox = layxs.loading('加载中...');
