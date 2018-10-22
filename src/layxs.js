@@ -74,9 +74,9 @@
                 while (res = reg2.exec(item)) {
                     if (temp) {
                         //匹配到的值为数字则是数组，否则为对象
-                        if (reg1.test(res[1]) && oftenFunc.isType(temp[prev]) !== 'array') {
+                        if (reg1.test(res[1]) && oftenFunc.type(temp[prev]) !== 'array') {
                             temp[prev] = [];
-                        } else if (oftenFunc.isType(temp[prev]) !== 'object') {
+                        } else if (oftenFunc.type(temp[prev]) !== 'object') {
                             temp[prev] = {};
                         }
                         temp = temp[prev];
@@ -88,10 +88,19 @@
             });
             return temp[prev] = value;
         },
+        //判断指定对象的数据类型
+        type: function (obj, name) {
+            var toString = Object.prototype.toString.call(obj).toLowerCase();
+            if (name) {
+                return toString === '[object ' + name.toLowerCase() + ']';
+            } else {
+                return /^\[object (\w+)\]$/.exec(toString)[1];
+            }
+        },
         //对象克隆(克隆者,是否使用深克隆模式)
         clone: function (obj, isDepth) {
             var newobj;
-            switch (oftenFunc.isType(obj)) {
+            switch (oftenFunc.type(obj)) {
                 case 'array':
                     newobj = []; break;
                 case 'object':
@@ -108,22 +117,6 @@
                 }
             });
             return newobj;
-        },
-        //判断指定对象的数据类型
-        isType: function (obj, name) {
-            var toString = Object.prototype.toString.call(obj).toLowerCase();
-            if (name) {
-                return toString === '[object ' + name.toLowerCase() + ']';
-            } else {
-                return /^\[object (\w+)\]$/.exec(toString)[1];
-            }
-        },
-        //判断是否为 undefined | null | '' 中的任意一个
-        isEmpty: function (val) {
-            if (val === '' || val === null || val === undefined) {
-                return true;
-            }
-            return false;
         },
         //数组去重(数组对象,比对指定路径的值)
         unique: function (list, path) {
@@ -146,15 +139,15 @@
                     return;
                 }
                 if (isDepth) {
-                    switch (oftenFunc.isType(byheres[name])) {
+                    switch (oftenFunc.type(byheres[name])) {
                         case 'array':
-                            if (oftenFunc.isType(heres[name]) !== 'array') {
+                            if (oftenFunc.type(heres[name]) !== 'array') {
                                 heres[name] = [];
                             }
                             oftenFunc.extend(heres[name], byheres[name], isAll, isDepth);
                             break;
                         case 'object':
-                            if (oftenFunc.isType(heres[name]) !== 'object') {
+                            if (oftenFunc.type(heres[name]) !== 'object') {
                                 heres[name] = {};
                             }
                             oftenFunc.extend(heres[name], byheres[name], isAll, isDepth);
@@ -178,6 +171,13 @@
                 }
             });
             return index;
+        },
+        //判断是否为 undefined | null | '' 中的任意一个
+        isEmpty: function (val) {
+            if (val === '' || val === null || val === undefined) {
+                return true;
+            }
+            return false;
         },
         //获取url参数
         getParams: function (name) {
@@ -363,7 +363,7 @@
             var that = this;
             var data = {};
             var name = arguments[0];
-            switch (oftenFunc.isType(name)) {
+            switch (oftenFunc.type(name)) {
                 case 'string':
                     if (arguments[1] === undefined) {
                         var style = getComputedStyle(that, arguments[2]);
@@ -393,7 +393,7 @@
         attr: function () {
             var that = this;
             var option = arguments[0];
-            switch (oftenFunc.isType(option)) {
+            switch (oftenFunc.type(option)) {
                 case 'string':
                     if (arguments[1] === undefined) {
                         return that.getAttribute(option);
@@ -924,7 +924,7 @@
             Object.keys(equation.unit).forEach(function (name) {
                 exp = exp.replace(name, equation.unit[name]);
             });
-            if (oftenFunc.isType(custom) === 'object') {
+            if (oftenFunc.type(custom) === 'object') {
                 Object.keys(custom).forEach(function (name) {
                     exp = exp.replace(name, custom[name]);
                 });
@@ -1624,9 +1624,9 @@
     Prompt.prototype.confirm = function () {
         var that = this;
         var input = that.elementCache['body'].querySelector('.ly-input')
-        if (oftenFunc.isType(that.currentConfig.callback) === 'function') {
+        if (oftenFunc.type(that.currentConfig.callback) === 'function') {
             var val = input.value;
-            if (oftenFunc.isType(that.currentConfig.verify) === 'function') {
+            if (oftenFunc.type(that.currentConfig.verify) === 'function') {
                 var result = that.currentConfig.verify(val);
                 if (result === true) {
                     that.currentConfig.callback.call(that, val);
@@ -1772,7 +1772,7 @@
         var that = this;
         var config;
         var option = arguments[0];
-        switch (oftenFunc.isType(option)) {
+        switch (oftenFunc.type(option)) {
             case 'object':
                 config = option;
                 break;
@@ -1797,7 +1797,7 @@
         var that = this;
         var config;
         var option = arguments[0];
-        switch (oftenFunc.isType(option)) {
+        switch (oftenFunc.type(option)) {
             case 'object':
                 config = option;
                 break;
@@ -1817,7 +1817,7 @@
         var that = this;
         var config;
         var option = arguments[0];
-        switch (oftenFunc.isType(option)) {
+        switch (oftenFunc.type(option)) {
             case 'object':
                 config = option;
                 break;
@@ -1848,7 +1848,7 @@
         var that = this;
         var config;
         var option = arguments[0];
-        switch (oftenFunc.isType(option)) {
+        switch (oftenFunc.type(option)) {
             case 'object':
                 config = option;
                 break;
@@ -1873,7 +1873,7 @@
         var that = this;
         var config;
         var option = arguments[0];
-        switch (oftenFunc.isType(option)) {
+        switch (oftenFunc.type(option)) {
             case 'object':
                 config = option;
                 break;
@@ -1895,7 +1895,7 @@
         var that = this;
         var config;
         var option = arguments[0];
-        switch (oftenFunc.isType(option)) {
+        switch (oftenFunc.type(option)) {
             case 'object':
                 config = option;
                 break;
@@ -1903,7 +1903,7 @@
                 config = {
                     text: option
                 };
-                if (oftenFunc.isType(arguments[1]) === 'function') {
+                if (oftenFunc.type(arguments[1]) === 'function') {
                     config.callback = arguments[1];
                 }
                 break;
@@ -1920,7 +1920,7 @@
         var that = this;
         var config;
         var option = arguments[0];
-        switch (oftenFunc.isType(option)) {
+        switch (oftenFunc.type(option)) {
             case 'object':
                 config = option;
                 break;
@@ -1928,7 +1928,7 @@
                 config = {
                     text: option
                 };
-                if (oftenFunc.isType(arguments[1]) === 'function') {
+                if (oftenFunc.type(arguments[1]) === 'function') {
                     config.btnEvent = arguments[1];
                 }
                 break;
@@ -1945,7 +1945,7 @@
         var that = this;
         var config;
         var option = arguments[0];
-        switch (oftenFunc.isType(option)) {
+        switch (oftenFunc.type(option)) {
             case 'object':
                 config = option;
                 break;
