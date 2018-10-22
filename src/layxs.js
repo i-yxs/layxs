@@ -500,7 +500,7 @@
             return null;
         },
     };
-    window.oftenDomFunc = oftenDomFunc = new oftenDomFunc();
+    oftenDomFunc = new oftenDomFunc();
     //tap事件处理
     oftenDomFunc.event.tap = {
         //手指按下到提起的最大间隔时间，超出则不触发事件
