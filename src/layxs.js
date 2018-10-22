@@ -44,7 +44,7 @@
     /*
      *  常用功能
      */
-    function oftenFunc() { };
+    function oftenFunc() { }; 
     oftenFunc.prototype = {
         //获取对象指定key的值
         get: function (obj, path) {
@@ -117,6 +117,13 @@
             } else {
                 return /^\[object (\w+)\]$/.exec(toString)[1];
             }
+        },
+        //判断是否为 undefined | null | '' 中的任意一个
+        isEmpty: function (val) {
+            if (val === '' || val === null || val === undefined) {
+                return true;
+            }
+            return false;
         },
         //数组去重(数组对象,比对指定路径的值)
         unique: function (list, path) {
@@ -1520,7 +1527,7 @@
     oftenFunc.extend(Open.prototype.defaultConfig, {
         area: {
             'maxWidth': '80%',
-            'maxHeight': '80%'
+            'maxHeight': '80%',
         },
         module: 'open',
         isScroll: true,
@@ -1682,7 +1689,12 @@
 
         that.on('updatebefore', function () {
             that.currentConfig.content = content;
-            that.elementCache['text'].innerText = that.currentConfig.text;
+            if (oftenFunc.isEmpty(that.currentConfig.text)) {
+                oftenDomFunc.addClass.call(that.elementCache['text'], 'ly-hide');
+            } else {
+                oftenDomFunc.removeClass.call(that.elementCache['text'], 'ly-hide');
+                that.elementCache['text'].innerText = that.currentConfig.text;
+            }
         });
         if (that.currentConfig.isAutoShow) {
             that.show();
@@ -1692,8 +1704,7 @@
     oftenFunc.extend(Loading.prototype.defaultConfig, {
         text: '',
         area: {
-            'minWidth': '90',
-            'maxWidth': '60%'
+            'maxWidth': '140'
         },
         module: 'loading',
         boxback: 'rgba(0,0,0,.8)',
