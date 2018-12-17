@@ -203,7 +203,7 @@ layxs.alert({
     text:'请问你觉得 layxs 好用吗？',
     button: ['<font color="#999">不好用</font>', '好用'],
     btnEvent: function (idx) {
-        switch (index) {
+        switch (idx) {
             case 0:
                 //点击了第一个按钮
                 break;
