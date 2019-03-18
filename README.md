@@ -5,9 +5,9 @@
 移动端兼容 iOS 6.0+ 和 Android 4.0+ ，PC端兼容 IE9+
 
 
-效果图：
+demo：
 ---------------------------
-![](https://github.com/qq597392321/layxs/blob/master/demo/gif/1.gif) 
+[dome](https://i-yxs.github.io/layxs/demo/index.html)
 
 
 使用方法：
