@@ -7,7 +7,7 @@
 
 demo：
 ---------------------------
-[dome](https://i-yxs.github.io/layxs/demo/index.html)
+[demo](https://i-yxs.github.io/layxs/demo/index.html)
 
 
 使用方法：
